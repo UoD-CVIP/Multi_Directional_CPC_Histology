@@ -6,7 +6,9 @@ This file is the main executable for Multi-Directional Contrastive Predictive Co
 This file loads the arguments, sets random seed and runs a selected task.
 """
 
+
 # Own Module Import
+from config import *
 
 
 __author__ = "Jacob Carse"
@@ -20,4 +22,7 @@ __status__ = "Development"
 
 
 if __name__ == "__main__":
-    pass
+    # Loads the arguments from a config file and command line arguments.
+    description = "An implementation of Multi-Directional Contrastive Predictive Coding for Histology."
+    arguments = load_arguments(description)
+    print("Loaded Arguments")
