@@ -26,4 +26,5 @@ if __name__ == "__main__":
     # Loads the arguments from a config file and command line arguments.
     description = "An implementation of Multi-Directional Contrastive Predictive Coding for Histology."
     arguments = load_arguments(description)
-    log(arguments, "Loaded Arguments")
+    log(arguments, "Loaded Arguments:")
+    print_arguments(arguments)

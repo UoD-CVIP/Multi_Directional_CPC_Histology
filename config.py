@@ -11,6 +11,9 @@ import sys
 from argparse import ArgumentParser
 from configparser import ConfigParser
 
+# Own Module Import
+from utils import *
+
 
 __author__ = "Jacob Carse"
 __copyright__ = "Copyright 2020, Multi-Directional Contrastive Predictive Coding for Histology"
@@ -65,3 +68,14 @@ def load_arguments(description):
     # Returns the argument parser.
     arguments = argument_parser.parse_args()
     return vars(arguments)
+
+
+def print_arguments(arguments):
+    """
+    Print all the arguments to the command line.
+    :param arguments: ArgumentParser Namespace object.
+    """
+
+    # Cycles through all the arguments within the Namespace object.
+    for key, value in arguments.items():
+        log(arguments, f"{key: <24}: {value}")
