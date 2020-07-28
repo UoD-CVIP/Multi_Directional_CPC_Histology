@@ -8,6 +8,7 @@ This file loads the arguments, sets random seed and runs a selected task.
 
 
 # Own Module Import
+from utils import *
 from config import *
 
 
@@ -25,4 +26,4 @@ if __name__ == "__main__":
     # Loads the arguments from a config file and command line arguments.
     description = "An implementation of Multi-Directional Contrastive Predictive Coding for Histology."
     arguments = load_arguments(description)
-    print("Loaded Arguments")
+    log(arguments, "Loaded Arguments")

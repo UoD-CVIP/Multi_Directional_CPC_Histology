@@ -28,7 +28,7 @@ def load_arguments(description):
     Arguments from command line overrides arguments from the config file.
     The config file will be loaded from the default location ./config.ini and can be overridden from the command line.
     :param description: The description of the application.
-    :return: ArgumentParser Namespace object.
+    :return: Dictionary of arguments.
     """
 
     # Creates a ArgumentParser to read command line arguments.
@@ -57,6 +57,11 @@ def load_arguments(description):
                                  default=config_parser["standard"]["task"],
                                  help="String representing the task for the application to run.")
 
+    # Logging Arguments
+    argument_parser.add_argument("--log_dir", type=str,
+                                 default=config_parser["logging"]["log_dir"],
+                                 help="Directory where the log files will be stored.")
 
     # Returns the argument parser.
-    return argument_parser.parse_args()
+    arguments = argument_parser.parse_args()
+    return vars(arguments)
