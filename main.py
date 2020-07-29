@@ -28,3 +28,7 @@ if __name__ == "__main__":
     arguments = load_arguments(description)
     log(arguments, "Loaded Arguments:")
     print_arguments(arguments)
+
+    if arguments["seed"] != 0:
+        set_random_seed(arguments["seed"])
+        log(arguments, f"Set Random Seed to {arguments['seed']}")

@@ -8,6 +8,11 @@ This file contains the following utility functions for the application:
 
 # Built-in/Generic Imports
 import os
+import random
+
+# Library Imports
+import torch
+import numpy as np
 
 
 __author__ = "Jacob Carse"
@@ -38,3 +43,21 @@ def log(arguments, message):
 
         # Logs te message to the log file.
         print(message, file=open(os.path.join(arguments["log_dir"], f"{arguments['experiment']}_log.txt"), 'a'))
+
+
+def set_random_seed(seed):
+    """
+    Sets a random seed for each python library that generates random numbers.
+    :param seed: Integer for the number used as the seed.
+    """
+
+    # Sets the random seed for python libraries.
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    # Sets PyTorch to be deterministic if using CUDNN.
+    if torch.backends.cudnn.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
