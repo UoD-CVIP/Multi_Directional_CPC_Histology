@@ -30,6 +30,7 @@ class EfficientNetEncoder(nn.Module):
     Class for the EfficientNet encoder model, containing the methods:
         init - Initialiser for the model.
         forward - Forward propagation for the encoder model.
+        save_model - Method for saving the model.
     """
 
     def __init__(self, arguments):
@@ -91,3 +92,64 @@ class EfficientNetEncoder(nn.Module):
             torch.save(self.state_dict(), os.path.join(path, f"{name}_encoder_{str(epoch)}.pt"))
         else:
             torch.save(self.state_dict(), os.path.join(path, f"{name}_encoder.pt"))
+
+
+class MaskedConv2D(nn.Conv2d):
+    """
+    Convolutional Layer that applies a mask to the weights of the convolutional kernel, containing methods:
+        init - Initiliser for the masked convolutional layer.
+        forward - Method for forward propagation of the model.
+    """
+
+    def __init__(self, mask_type, rotation, c_in, c_out, k_size, stride, pad):
+        """
+        Initiliser for the masked convolutonal layer.
+        :param mask_type: The type of the mask either A or B.
+        :param rotation: Integer for the number of degrees the mask should be rotated.
+        :param c_in: Integer for the number of input channels.
+        :param c_out: Integer for the number of output channels.
+        :param k_size: Integer for the size of the convolutional kernel.
+        :param stride: Integer for the size of the convolution.
+        :param pad: Integer for the amount of padding applied to each image.
+        """
+
+        # Calls the super for the nn.Conv2d.
+        super(MaskedConv2D, self).__init__(c_in, c_out, k_size, stride, pad, bias=False)
+
+        # Defines the size of the weights.
+        ch_out, ch_in, height, width = self.weight.size()
+
+        # Creates the weight mask.
+        mask = torch.ones(ch_out, ch_in, height, width)
+
+        # Alters the mask shape based on mask type.
+        if mask_type == 'A':
+            mask[:, :, height // 2, width // 2:] = 0
+            mask[:, :, height // 2 + 1:] = 0
+        elif mask_type == 'B':
+            mask[:, :, height // 2, width // 2 + 1:] = 0
+            mask[:, :, height // 2:] = 0
+
+        # Rotates the mask to the given rotation.
+        if rotation == 90:
+            mask = mask.transpose(2, 3)
+        elif rotation == 180:
+            mask = mask.flip(2)
+        elif rotation == 270:
+            mask = mask.transpose(2, 3).flip(3)
+
+        # Adds a persistent buffer for the mask.
+        self.register_buffer("mask", mask)
+        
+    def forward(self, x):
+        """
+        The forward propagation for the masked convolutional layer.
+        :param x: The input to the forward propagation pass.
+        :return: The output of the forward propagation pass.
+        """
+
+        # Applies the mask to the weights of the convolutional layers.
+        self.weight.data *= self.mask
+
+        # Performs a forward pass with the masked weights.
+        return super(MaskedConv2D, self).forward(x)
