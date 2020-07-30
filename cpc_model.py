@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 
 """
-
+The file contains the implementations of the models used for the Multi-Directional Contrastive Predictive Coding.
+    EfficientNetEncoder - Class for defining an encoder based on EfficientNet.
+    MaskedConv2D - Class to define a masked convolutional layer.
+    MultiDirectionalPixelCNN - Class for defining a PixelCNN autoregressor with optional multi-directional.
 """
 
 
 # Built-in/Generic Imports
 import os
-import types
 
 # Library Imports
 import torch
@@ -155,9 +157,14 @@ class MaskedConv2D(nn.Conv2d):
         return super(MaskedConv2D, self).forward(x)
 
 
-class MultiDirectionalPixelCnn(nn.Module):
+class MultiDirectionalPixelCNN(nn.Module):
     """
-
+    Class for the Multi-Directional Autoregressor model, containing the methods:
+        init - Initiliser for the Multi-Directional PixelCNN.
+        masked_block - Method to define a block with a Masked Convolutional layer.
+        multi_directional_masked_block - Method to define a multi directional block with a Masked Convolutional layer.
+        forward - Method for forward propagating the model.
+        save_model - Method for saving the model.
     """
 
     def __init__(self, n_channels, h=128, multi_directional=True):
@@ -169,10 +176,31 @@ class MultiDirectionalPixelCnn(nn.Module):
         """
 
         # Calls the super for the nn.Conv2d.
-        super(MultiDirectionalPixelCnn, self).__init__()
+        super(MultiDirectionalPixelCNN, self).__init__()
 
-        #
+        # Stores the boolean if multi directional pixel should be used.
         self.multi_directional = multi_directional
+
+        # Defines the masked blocks for the PixelCNN
+        self.conv_A = self.multi_directional_masked_block(n_channels, h, 'A')
+        self.conv_B1 = self.multi_directional_masked_block(n_channels, h, 'B')
+        self.conv_B2 = self.multi_directional_masked_block(n_channels, h, 'B')
+        self.conv_B3 = self.multi_directional_masked_block(n_channels, h, 'B')
+        self.conv_B4 = self.multi_directional_masked_block(n_channels, h, 'B')
+        self.conv_B5 = self.multi_directional_masked_block(n_channels, h, 'B')
+
+        # Defines the 1x1 Convolutional layers for the Multi-Directional PixelCNN.
+        if multi_directional:
+            self.convs = nn.ModuleList([nn.Conv2d(1024, 256, kernel_size=1, stride=1, padding=0)])
+            for _ in range(4):
+                self.convs.append(nn.Conv2d(1024, 256, kernel_size=1, stride=1, padding=0))
+
+        # Defies the output block for the PixelCNN.
+        self.out = nn.Sequential(nn.ReLU(),
+                                 nn.Conv2d(1024 if multi_directional else 252, 1024, kernel_size=1, stride=1, padding=0),
+                                 nn.BatchNorm2d(1024),
+                                 nn.ReLU(),
+                                 nn.Conv2d(1024, n_channels, kernel_size=1, stride=1, padding=0))
 
     def masked_block(self, rotation, h):
         """
@@ -230,3 +258,54 @@ class MultiDirectionalPixelCnn(nn.Module):
         batch_size, c_in, height, width = x.size()
 
         # Forward propagation for the multi-directional PixelCNN.
+        if self.multi_directional:
+            x = torch.cat([self.conv_A[0](x), self.conv_A[1](x).transpose(2, 3).flip(3),
+                           self.conv_A[2](x).flip(2), self.conv_A[3](x).transpose(2, 3)], dim=1)
+            x = self.convs[0](x)
+            x = torch.cat([self.conv_B1[0](x), self.conv_B1[1](x).transpose(2, 3).flip(3),
+                           self.conv_B1[2](x).flip(2), self.conv_B1[3](x).transpose(2, 3)], dim=1)
+            x = self.convs[1](x)
+            x = torch.cat([self.conv_B2[0](x), self.conv_B2[1](x).transpose(2, 3).flip(3),
+                           self.conv_B2[2](x).flip(2), self.conv_B2[3](x).transpose(2, 3)], dim=1)
+            x = self.convs[2](x)
+            x = torch.cat([self.conv_B3[0](x), self.conv_B3[1](x).transpose(2, 3).flip(3),
+                           self.conv_B3[2](x).flip(2), self.conv_B3[3](x).transpose(2, 3)], dim=1)
+            x = self.convs[3](x)
+            x = torch.cat([self.conv_B4[0](x), self.conv_B4[1](x).transpose(2, 3).flip(3),
+                           self.conv_B4[2](x).flip(2), self.conv_B4[3](x).transpose(2, 3)], dim=1)
+            x = self.convs[4](x)
+            x = torch.cat([self.conv_B5[0](x), self.conv_B5[1](x).transpose(2, 3).flip(3),
+                           self.conv_B5[2](x).flip(2), self.conv_B5[3](x).transpose(2, 3)], dim=1)
+
+        # Forward propagation for PixelCNN.
+        else:
+            x = self.conv_A[0](x)
+            x = self.conv_B1[0](x)
+            x = self.conv_B2[0](x)
+            x = self.conv_B3[0](x)
+            x = self.conv_B4[0](x)
+            x = self.conv_B5[0](x)
+
+        # Output layer for both PixelCNN and Multi-Directional PixelCNN.
+        x = self.out(x)
+
+        # Returns the output reshaped to the original dimensions.
+        return x.view(batch_size, c_in, height, width)
+
+    def save_model(self, path, name, epoch=None):
+        """
+        Method for saving the encoder model.
+        :param path: Directory path to save the encoder.
+        :param name: The name of the experiment to be saved.
+        :param epoch: Integer for the current epoch to be included in the save name.
+        """
+
+        # Checks if the save directory exists and if not creates it.
+        if not os.path.isdir(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
+        # Saves the model to the save directory.
+        if epoch is not None:
+            torch.save(self.state_dict(), os.path.join(path, name + f"_autoregressor_{str(epoch)}.pt"))
+        else:
+            torch.save(self.state_dict(), os.path.join(path, name + "_autoregressor.pt"))
