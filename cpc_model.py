@@ -153,3 +153,80 @@ class MaskedConv2D(nn.Conv2d):
 
         # Performs a forward pass with the masked weights.
         return super(MaskedConv2D, self).forward(x)
+
+
+class MultiDirectionalPixelCnn(nn.Module):
+    """
+
+    """
+
+    def __init__(self, n_channels, h=128, multi_directional=True):
+        """
+        The initiliser for the Multi-Directional PixelCNN.
+        :param n_channels: Integer for the number of input channels.
+        :param h: Integer for the size fo the hidden layers in the PixelCNN.
+        :param multi_directional: Boolean for if the Multi-Directional PixelCNN should be used.
+        """
+
+        # Calls the super for the nn.Conv2d.
+        super(MultiDirectionalPixelCnn, self).__init__()
+
+        #
+        self.multi_directional = multi_directional
+
+    def masked_block(self, rotation, h):
+        """
+        A masked convolutional block using a given rotation.
+        :param rotation: Integer for the rotation for the masked convolutional layer either 0, 90, 180 or 270.
+        :param h: Integer for the size of the hidden layer.
+        :return: PyTorch model with the masked convolutional block.
+        """
+
+        return nn.Sequential(nn.ReLU(),
+                             nn.Conv2d(2 * h, h, 1),
+                             nn.BatchNorm2d(h),
+                             MaskedConv2D('B', rotation, h, h, 3, 1, 1),
+                             nn.BatchNorm2d(h),
+                             nn.ReLU(),
+                             nn.Conv2d(h, 2 * h, 1),
+                             nn.BatchNorm2d(2 * 2))
+
+    def multi_directional_masked_block(self, n_channels, h, mask_type):
+        """
+        A multi dimensional masked block made of blocks from multiple dimensions.
+        :param n_channels: Integer for the number of input channels.
+        :param h: Integer for the size of the hidden layer.
+        :param mask_type: The type of maksed block, A or B.
+        :return: A ModuleList for the masked convolutional blocks.
+        """
+
+        # Defines a list of convolutional blocks.
+        masked_conv = nn.ModuleList([])
+
+        # Appends a block with 0 degree rotation.
+        masked_conv.append(MaskedConv2D('A', 0, n_channels, 2 * h, k_size=7, stride=1,
+                                        pad=3) if mask_type == 'A' else self.masked_block(0, h))
+
+        # If multi-directional is being used append blocks with multiple directions
+        if self.multi_directional:
+            masked_conv.append(MaskedConv2D('A', 90, n_channels, 2 * h, k_size=7, stride=1,
+                                            pad=3) if mask_type == 'A' else self.masked_block(90, h))
+            masked_conv.append(MaskedConv2D('A', 180, n_channels, 2 * h, k_size=7, stride=1,
+                                            pad=3) if mask_type == 'A' else self.masked_block(180, h))
+            masked_conv.append(MaskedConv2D('A', 270, n_channels, 2 * h, k_size=7, stride=1,
+                                            pad=3) if mask_type == 'A' else self.masked_block(270, h))
+
+        # Returns the ModuleList containing masked convolutional blocks.
+        return masked_conv
+
+    def forward(self, x):
+        """
+        Forward propagation for the PixelCNN using multi-directional blocks if specified.
+        :param x: The input to the forward propagation.
+        :return: The output of the forward propagation.
+        """
+
+        # The dimensions of the input.
+        batch_size, c_in, height, width = x.size()
+
+        # Forward propagation for the multi-directional PixelCNN.
