@@ -35,20 +35,19 @@ class EfficientNetEncoder(nn.Module):
         save_model - Method for saving the model.
     """
 
-    def __init__(self, arguments):
+    def __init__(self, b, pretraining, code_size):
         """
         Initialiser for the model that initialises hte models layers.
-        :param arguments: Dictionary of arguments.
+        :param b: The compound coefficient for the EfficientNet model.
+        :param pretraining: The type of pretraining to use.
+        :param code_size: The size of the output feature vectors.
         """
 
         # Calls the super for the nn.Module.
         super(EfficientNetEncoder, self).__init__()
 
-        # Gets the compound coefficient for EfficientNet.
-        b = str(arguments['efficientnet_b'])
-
         # Loads the model with pretaining if selected.
-        if arguments["pretraining"] == "imagenet":
+        if pretraining == "imagenet":
             self.encoder = EfficientNet.from_pretrained(f"efficientnet-b{b}")
         else:
             self.encoder = EfficientNet.from_name(f"efficientnet-b{b}")
@@ -62,7 +61,7 @@ class EfficientNetEncoder(nn.Module):
             encoder_size = self.encoder.extract_features(temp_input).shape[1]
 
         # Initialises the code head for outputting feature vector.
-        self.code_out = nn.Linear(encoder_size, arguments["code_size"])
+        self.code_out = nn.Linear(encoder_size, code_size)
 
     def forward(self, x):
         """
