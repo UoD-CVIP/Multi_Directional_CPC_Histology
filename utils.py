@@ -16,8 +16,8 @@ import numpy as np
 
 
 __author__ = "Jacob Carse"
-__copyright__ = "Copyright 2020, Multi-Directional Contrastive Predictive Coding"
-__credits__ = ["Jacob Carse"]
+__copyright__ = "Copyright 2020, Multi-Directional Contrastive Predictive Coding for Histology"
+__credits__ = ["Jacob Carse", "Stephen McKenna"]
 __license__ = "MIT"
 __version__ = "0.0.1"
 __maintainer__ = "Jacob Carse"
