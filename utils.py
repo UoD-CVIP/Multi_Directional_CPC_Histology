@@ -3,6 +3,8 @@
 """
 This file contains the following utility functions for the application:
     log - Function to both print and log a given input message.
+    set_random_seed - Function that sets a seed for all random number generation functions.
+    get_device - Function to get the device that will be used.
 """
 
 
@@ -61,3 +63,22 @@ def set_random_seed(seed):
     if torch.backends.cudnn.is_available():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+
+def get_device(arguments):
+    """
+    Sets the Default GPU that the device will use for training and testing.
+    :param arguments: A Dictonary of arguments.
+    :return: A PyTorch device.
+    """
+
+    # If GPU is set to less than 0 then set device to use CPU.
+    if arguments["gpu"] > 0 and not torch.cuda.is_available():
+        return torch.device("cpu")
+
+    # Sets the GPU device to perfered device and checks if available.
+    else:
+        if arguments["gpu"] > torch.cuda.device_count() - 1:
+            return torch.device(f"cuda:{torch.cuda.device_count() - 1}")
+        else:
+            return torch.device(f"cuda:{arguments['gpu']}")

@@ -65,6 +65,11 @@ def load_arguments(description):
                                  default=config_parser["logging"]["log_dir"],
                                  help="Directory where the log files will be stored.")
 
+    # Performance Arguments
+    argument_parser.add_argument("--gpu", type=int,
+                                 default=int(config_parser["performance"]["gpu"]),
+                                 help="Integer to indicate which gpu to be used.")
+
     # Returns the argument parser.
     arguments = argument_parser.parse_args()
     return vars(arguments)
