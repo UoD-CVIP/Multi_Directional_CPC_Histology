@@ -71,7 +71,12 @@ def extract_patches(arguments, images, num_patches):
 
 class Dataset(data.Dataset):
     """
-
+    Class for the handling and loading of images and labels.
+        init - Initiliser for the class used to load an array of filenames and labels.
+        len - Gets the length of the dataset.
+        get_item - Gets a image and label from the dataset based on a given index.
+        augment - Applies augmentations to the image and converts it to a tensor.
+        get_validation_set - Splits the dataset into training and validation.
     """
 
     def __init__(self, arguments, mode, filenames=None, labels=None):
@@ -162,3 +167,16 @@ class Dataset(data.Dataset):
 
         # Return the image with the standard transforms applied.
         return transforms.Compose(transformations)(image)
+
+    def get_validation_set(self):
+        """
+        Gets a Dataset object comprised of data extracted from the training set.
+        :return: A Dataset object.
+        """
+
+        # Splits the filenames and labels into training and validation.
+        self.data_frame, val_data, self.labels, val_labels = train_test_split(self.data_frame, self.labels,
+                                                                              test_size=self.arguments["val_split"])
+
+        # Returns a Dataset object built using the validation data and labels.
+        return Dataset(self.arguments, "validation", val_data, val_labels)
