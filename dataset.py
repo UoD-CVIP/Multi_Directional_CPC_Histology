@@ -96,7 +96,7 @@ class Dataset(data.Dataset):
         self.mode = mode
 
         # Sets the validation data to the given input.
-        if mode == "validation":
+        if filenames is not None:
             self.filenames = filenames
             self.labels = labels
 
@@ -175,8 +175,24 @@ class Dataset(data.Dataset):
         """
 
         # Splits the filenames and labels into training and validation.
-        self.data_frame, val_data, self.labels, val_labels = train_test_split(self.data_frame, self.labels,
-                                                                              test_size=self.arguments["val_split"])
+        self.filenames, val_filenames, self.labels, val_labels = train_test_split(self.filenames, self.labels,
+                                                                                  test_size=self.arguments["val_split"])
 
         # Returns a Dataset object built using the validation data and labels.
-        return Dataset(self.arguments, "validation", val_data, val_labels)
+        return Dataset(self.arguments, "validation", val_filenames, val_labels)
+
+    def shuffle(self):
+        """
+        Shuffles the dataset and returns a new dataset with the shuffled data.
+        :return: A dataset object with the shuffled data.
+        """
+
+        # Creates a random list with the indices of the data.
+        indices = np.random.permutation(len(self.filenames))
+
+        # Shuffles the filenames and labels.
+        shuffled_data = self.filenames[indices]
+        shuffled_labels = self.labels[indices]
+
+        # Returns a Dataset object with the shuffled data.
+        return Dataset(self.arguments, self.mode, shuffled_data, shuffled_labels)
