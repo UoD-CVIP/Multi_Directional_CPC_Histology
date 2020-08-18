@@ -114,15 +114,15 @@ def train_cpc(arguments, device):
         epoch_loss, num_batches = 0, 0
 
         # Loops through the dataset by each batch.
-        for image, _ in training_data_loader:
+        for batch, _ in training_data_loader:
             batch_losses = []
 
             # Loads the batch into memory and splits the batch into patches.
-            image = image.to(device)
-            image = extract_patches(arguments, image, in_patches)
+            batch = batch.to(device)
+            batch = extract_patches(arguments, batch, in_patches)
 
             # Encodes the patches with the encoder.
-            encoded_batch = encoder.forward(image)
+            encoded_batch = encoder.forward(batch)
             encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
             encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
@@ -136,7 +136,7 @@ def train_cpc(arguments, device):
             random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
             random_encoded = random_encoded.permute(0, 3, 1, 2)
 
-            # Autoregressor predicts the encoded features of half the image from the other half.
+            # Clones the encoded batch for masking.
             masked_batch = encoded_batch.clone()
 
             # Applies a mask to the encoded batch.
@@ -222,4 +222,87 @@ def train_cpc(arguments, device):
         if arguments["tensorboard"]:
             writer.add_scalar("Loss/train", epoch_loss / num_batches, epoch)
 
-        # Validation
+        # Performs a validation epoch with no gradients.
+        with torch.no_grad():
+
+            # Logging metrics for validation epoch.
+            validation_loss, validation_batches = 0, 0
+
+            # Loops through the validation dataset.
+            for batch, _ in validation_data_loader:
+                batch_losses = []
+
+                # Moves the batch to the selected device and splits the images to patches.
+                batch = batch.to(device)
+                batch = extract_patches(arguments, batch, in_patches)
+
+                # Encodes the patches with the encoder.
+                encoded_batch = encoder.forward(batch)
+                encoded_batch = encoded_batch.view(arguments["cpc_batch_size"], in_patches, in_patches, -1)
+                encoded_batch = encoded_batch.permute(0, 3, 1, 2)
+
+                # Loads the random patches into memory and splits into patches.
+                random_batch, _ = next(iter(random_validation_loader))
+                random_batch = random_batch.to(device)
+                random_batch = extract_patches(arguments, random_batch, in_patches)
+
+                # Encodes the random patches with the encoder.
+                random_encoded = encoder.forward(random_batch)
+                random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                random_encoded = random_encoded.permute(0, 3, 1, 2)
+
+                # Clones the encoded batch for masking.
+                masked_batch = encoded_batch.clone()
+
+                # Applies a mask to the encoded batch.
+                if arguments["cpc_alt_mask"]:
+                    for i in range(1, 6):
+                        for j in range(1, 6):
+                            masked_batch[:, :, i, j] = 0
+                else:
+                    for i in range(3, 7):
+                        for j in range(0, 7):
+                            masked_batch[:, :, i, j] = 0
+
+                # Forward propagates the autoregressor with the masked batch.
+                predictions = autoregressor.forward(masked_batch)
+
+                # Loops through the images in the batch.
+                for image in range(arguments["cpc_batch_size"]):
+
+                    # Gets the masked elements for the random patches.
+                    if arguments["cpc_alt_mask"]:
+                        predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                        target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                    else:
+                        predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                        target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+
+                    # Calculates the dot terms for the predicted patches.
+                    good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                    dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+
+                    # Loops through the random images for each batch.
+                    for random_image in range(arguments["cpc_random_patches"]):
+
+                        # Gets the masked elements for the random patches.
+                        if arguments["cpc_alt_mask"]:
+                            random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                        else:
+                            random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                        # Calculates the dot terms for the random patches.
+                        bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                        dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                    # Calculates the log softmax for all the dot terms.
+                    log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                    batch_losses.append(-log_softmax[0,])
+
+                # Combines the loss for each image into a batch loss
+                validation_loss += torch.sum(torch.cat(batch_losses))
+                validation_batches += 1
+
+        # Writes the validation loss to TensorBoard
+        if arguments["tensorboard"]:
+            writer.add_scalar("Loss/validation", validation_loss / validation_batches, epoch)
