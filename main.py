@@ -29,9 +29,11 @@ if __name__ == "__main__":
     log(arguments, "Loaded Arguments:")
     print_arguments(arguments)
 
+    # Sets the random seed if specified.
     if arguments["seed"] != 0:
         set_random_seed(arguments["seed"])
         log(arguments, f"Set Random Seed to {arguments['seed']}")
 
     # Gets device that is used for training the model.
     device = get_device(arguments)
+    log(arguments, f"Running on Device: {device}")
