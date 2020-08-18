@@ -35,8 +35,9 @@ __status__ = "Development"
 def train_cpc(arguments, device):
     """
     Function used to train the Multi-Directional Contrastive Predictive Coding model.
-    :param arguments: Dictonary containing arguments.
+    :param arguments: Dictionary containing arguments.
     :param device: PyTorch device object.
+    :return Returns the lists of training and validation losses and an integer for the best performing epoch.
     """
 
     # Loads a TensorBoard Summary Writer.
@@ -103,7 +104,7 @@ def train_cpc(arguments, device):
     log(arguments, "Models Initialised")
 
     # Main logging variables declared.
-    losses, val_losses = [], []
+    losses, validation_losses = [], []
     best_loss, best_epoch, total_batches = 1e10, 0, 0
     start_time = time.time()
 
@@ -306,3 +307,45 @@ def train_cpc(arguments, device):
         # Writes the validation loss to TensorBoard
         if arguments["tensorboard"]:
             writer.add_scalar("Loss/validation", validation_loss / validation_batches, epoch)
+
+        # Adds the epoch and validation loss to a list of losses.
+        losses.append(epoch_loss / num_batches)
+        validation_losses.append(validation_loss / validation_batches)
+
+        # Logs the epoch information.
+        log(arguments, "\nEpoch: {}\tLoss{:.6f}\tValidation Loss: {:.6f}\n\n".
+            format(epoch, losses[-1], validation_losses[-1]))
+
+        # Adds the total number of batches.
+        total_batches += num_batches
+
+        # Checks if the validation loss is the best achieved loss and saves the model.
+        if validation_losses[-1] < best_loss:
+            best_loss = validation_losses[-1]
+            best_epoch = epoch
+            encoder.save_model(arguments["model_dir"], arguments["experiment"], "best")
+            autoregressor.save_model(arguments["model_dir"], arguments["experiment"], "best")
+
+        # Saves the models with reference to the current epoch
+        encoder.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+        autoregressor.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+
+        # Checks if training has performed the minimum number of epochs.
+        if epoch >= arguments["cpc_min_epochs"]:
+
+            # Calculates the generalised validation loss.
+            g_loss = 100 * ((validation_losses[-1] / min(validation_losses[:-1])) - 1)
+
+            # Calculates the training progress using a window over the training losses.
+            t_progress = 1000 * ((sum(losses[-(arguments["window"] + 1): - 1]) /
+                                  (arguments["window"] * min(losses[-(arguments["window"] + 1): - 1]))) - 1)
+
+            # Compares the generalised loss and training progress against a selected target value.
+            if g_loss / t_progress > arguments["target"]:
+                break
+
+    # Logs that the training has finished.
+    log(arguments, f"\n\nTraining Finished after {epoch} epochs in {int(time.time() - start_time)}s")
+
+    # Returns the loss values from the training.
+    return losses, validation_losses, best_epoch
