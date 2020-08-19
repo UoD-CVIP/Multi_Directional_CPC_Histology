@@ -2,6 +2,7 @@
 
 """
 This file contains the following utility functions for the application:
+    str_to_bool - Function to convert a string to boolean value.
     log - Function to both print and log a given input message.
     set_random_seed - Function that sets a seed for all random number generation functions.
     get_device - Function to get the device that will be used.
@@ -15,6 +16,7 @@ import random
 # Library Imports
 import torch
 import numpy as np
+from argparse import ArgumentTypeError
 
 
 __author__ = "Jacob Carse"
@@ -25,6 +27,30 @@ __version__ = "0.0.1"
 __maintainer__ = "Jacob Carse"
 __email__ = "j.carse@dundee.ac.uk"
 __status__ = "Development"
+
+
+def str_to_bool(argument):
+    """
+    Converts a string to a boolean value.
+    :param argument: Input string.
+    :return: Boolean value.
+    """
+
+    # Checks if the input is already a boolean.
+    if isinstance(argument, bool):
+        return argument
+
+    # Checks if the input is True.
+    elif argument.lower() == "true":
+        return True
+
+    # Checks if the input is False.
+    elif argument.lower() == "false":
+        return False
+
+    # Returns an error if no boolean value was found.
+    else:
+        raise ArgumentTypeError("Boolean value expected.")
 
 
 def log(arguments, message):

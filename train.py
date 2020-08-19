@@ -63,11 +63,11 @@ def train_cpc(arguments, device):
     random_validation_data = validation_data.shuffle()
 
     # Creates the random data loaders for the training and validation data.
-    random_training_loader = DataLoader(random_train_data, batch_size=arguments["random_patches"],
+    random_training_loader = DataLoader(random_train_data, batch_size=arguments["cpc_random_patches"],
                                              shuffle=True, num_workers=arguments["data_workers"],
                                              pin_memory=False, drop_last=True)
 
-    random_validation_loader = DataLoader(random_validation_data, batch_size=arguments["random_patches"],
+    random_validation_loader = DataLoader(random_validation_data, batch_size=arguments["cpc_random_patches"],
                                                shuffle=True, num_workers=arguments["data_workers"],
                                                pin_memory=False, drop_last=True)
 
@@ -115,7 +115,7 @@ def train_cpc(arguments, device):
     log(arguments, "Training Timer Started\n")
 
     # The beginning of the main training loop.
-    for epoch in range(1, arguments["cpc_max_epochs"] + 1):
+    for epoch in range(1, arguments["max_epochs"] + 1):
         epoch_loss, num_batches = 0, 0
 
         # Loops through the dataset by each batch.
@@ -158,7 +158,7 @@ def train_cpc(arguments, device):
             predictions = autoregressor.forward(masked_batch)
 
             # Loops through the images in the batch.
-            for image in range(arguments["cpc_batch_size"]):
+            for image in range(arguments["batch_size"]):
 
                 # Gets the masked elements of the predicted and encoded patches.
                 if arguments["cpc_alt_mask"]:
@@ -212,10 +212,10 @@ def train_cpc(arguments, device):
                 writer.add_scalar("Loss/batch", loss.item(), num_batches + total_batches)
 
             # Logs the details of the training batch.
-            if num_batches % arguments["log_itervals"] == 0:
+            if num_batches % arguments["log_intervals"] == 0:
                 log(arguments, "Time: {}s\tTrain Epoch: {} [{}/{}] ({:.0f}%)]\tLoss: {:.6f}".format(
                     str(int(time.time() - start_time)).rjust(6, '0'), str(epoch).rjust(2, '0'),
-                    str(num_batches * arguments["cpc_batch_size"]).rjust(len(str(len(train_data))), '0'),
+                    str(num_batches * arguments["batch_size"]).rjust(len(str(len(train_data))), '0'),
                     len(train_data), 100. * num_batches / len(train_data), epoch_loss / num_batches
                 ))
 
@@ -243,7 +243,7 @@ def train_cpc(arguments, device):
 
                 # Encodes the patches with the encoder.
                 encoded_batch = encoder.forward(batch)
-                encoded_batch = encoded_batch.view(arguments["cpc_batch_size"], in_patches, in_patches, -1)
+                encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
                 encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
                 # Loads the random patches into memory and splits into patches.
@@ -273,7 +273,7 @@ def train_cpc(arguments, device):
                 predictions = autoregressor.forward(masked_batch)
 
                 # Loops through the images in the batch.
-                for image in range(arguments["cpc_batch_size"]):
+                for image in range(arguments["batch_size"]):
 
                     # Gets the masked elements for the random patches.
                     if arguments["cpc_alt_mask"]:
@@ -335,7 +335,7 @@ def train_cpc(arguments, device):
         autoregressor.save_model(arguments["model_dir"], arguments["experiment"], epoch)
 
         # Checks if training has performed the minimum number of epochs.
-        if epoch >= arguments["cpc_min_epochs"]:
+        if epoch >= arguments["min_epochs"]:
 
             # Calculates the generalised validation loss.
             g_loss = 100 * ((validation_losses[-1] / min(validation_losses[:-1])) - 1)
@@ -375,7 +375,7 @@ def test_cpc(arguments, device):
     random_test_data = test_data.shuffle()
 
     # Creates the data loader for the random testing data.
-    random_test_loader = DataLoader(random_test_data, batch_size=arguments["random_patches"],
+    random_test_loader = DataLoader(random_test_data, batch_size=arguments["cpc_random_patches"],
                                     shuffle=True, num_workers=arguments["data_workers"],
                                     pin_memory=False, drop_last=True)
 
@@ -430,7 +430,7 @@ def test_cpc(arguments, device):
 
             # Encodes the patches with the encoder.
             encoded_batch = encoder.forward(batch)
-            encoded_batch = encoded_batch.view(arguments["cpc_batch_size"], in_patches, in_patches, -1)
+            encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
             encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
             # Loads the random patches into memory and splits into patches.
@@ -460,7 +460,7 @@ def test_cpc(arguments, device):
             predictions = autoregressor.forward(masked_batch)
 
             # Loops through the images in the batch.
-            for image in range(arguments["cpc_batch_size"]):
+            for image in range(arguments["batch_size"]):
 
                 # Gets the masked elements for the random patches.
                 if arguments["cpc_alt_mask"]:

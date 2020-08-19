@@ -134,7 +134,7 @@ class Dataset(data.Dataset):
         image = self.augment(image)
 
         # Returns the image tensor and label.
-        if self.arguments["float16"]:
+        if self.arguments["precision"] == 16:
             return image.type(torch.HalfTensor), int(self.labels[index])
         return image, int(self.labels[index])
 
@@ -153,7 +153,7 @@ class Dataset(data.Dataset):
         transformations = [transforms.ToTensor(), transforms.Normalize(mean=mean, std=std)]
 
         # Additional augmentations are applied is selected.
-        if self.arguments.augmentation:
+        if self.arguments["augmentation"]:
             # Random 90 degree rotations.
             class RandomRotation:
                 def __init__(self, angles): self.angles = angles
