@@ -8,6 +8,7 @@ This file loads the arguments, sets random seed and runs a selected task.
 
 
 # Own Module Import
+from train import *
 from utils import *
 from config import *
 
@@ -37,3 +38,16 @@ if __name__ == "__main__":
     # Gets device that is used for training the model.
     device = get_device(arguments)
     log(arguments, f"Running on Device: {device}")
+
+    # Trains and Tests a Contrastive Predictive Coding model.
+    if arguments["task"].lower() == "cpc":
+        train_cpc(arguments, device)
+        test_cpc(arguments, device)
+
+    # Trains a Contrastive Predictive Coding Model.
+    elif arguments["task"].lower() == "train_cpc":
+        train_cpc(arguments, device)
+
+    # Tests a Contrastive Predictive Coding Model.
+    elif arguments["task"].lower() == "test_cpc":
+        test_cpc(arguments, device)
