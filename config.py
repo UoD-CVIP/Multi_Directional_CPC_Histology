@@ -56,6 +56,9 @@ def load_arguments(description):
     argument_parser.add_argument("--task", type=str,
                                  default=config_parser["standard"]["task"],
                                  help="String representing the task for the application to run.")
+    argument_parser.add_argument("--seed", type=int,
+                                 default=int(config_parser["standard"]["seed"]),
+                                 help="Integer for the random seed.")
     argument_parser.add_argument("--experiment", type=str,
                                  default=config_parser["standard"]["experiment"],
                                  help="String representing the name of the current experiment.")
@@ -78,7 +81,7 @@ def load_arguments(description):
     argument_parser.add_argument("--precision", type=int,
                                  default=int(config_parser["performance"]["precision"]),
                                  help="Integer for the level of precision should be used. 16 or 32 supported.")
-    argument_parser.add_argument("data_workers", type=int,
+    argument_parser.add_argument("--data_workers", type=int,
                                  default=int(config_parser["performance"]["data_workers"]),
                                  help="Integer for the number of data workers used to load the dataset.")
 

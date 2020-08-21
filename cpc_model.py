@@ -71,7 +71,7 @@ class EfficientNetEncoder(nn.Module):
         """
 
         # Performs feature extraction with the encoder model.
-        x = self.encoder.extact_features(x)
+        x = self.encoder.extract_features(x)
         x = self.encoder_pool(x)
         x = x.view(x.shape[0], -1)
         return self.code_out(x)

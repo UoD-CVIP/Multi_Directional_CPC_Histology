@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+## -*- coding: utf-8 -*-
 
 """
 This file contains implementations of the functions used to train the multi directional CPC model:
@@ -78,7 +78,7 @@ def train_cpc(arguments, device):
     log(arguments, "Loaded Datasets")
 
     # Initialises the encoder and autoregressor.
-    encoder = EfficientNetEncoder(arguments["efficient_net_b"], arguments["cpc_code_size"])
+    encoder = EfficientNetEncoder(arguments["efficient_net_b"], None, arguments["cpc_code_size"])
     autoregressor = MultiDirectionalPixelCNN(arguments["cpc_code_size"],
                                              multi_directional=arguments["cpc_multi_directional"])
 
@@ -99,7 +99,7 @@ def train_cpc(arguments, device):
     # If 16 bit precision is being used change the model and optimisers precision.
     if arguments["precision"] == 16:
         [encoder, autoregressor], optimiser = amp.initialize([encoder, autoregressor], optimiser,
-                                                             opt_lebel="O2", verbosity=False)
+                                                             opt_level="O2", verbosity=False)
 
     # Checks if precision level is supported and if not defaults to 32.
     elif arguments["precision"] != 32:
@@ -386,7 +386,7 @@ def test_cpc(arguments, device):
     log(arguments, "Loaded Testing Data")
 
     # Initialises the encoder and autoregressor.
-    encoder = EfficientNetEncoder(arguments["efficient_net_b"], arguments["cpc_code_size"])
+    encoder = EfficientNetEncoder(arguments["efficient_net_b"], None, arguments["cpc_code_size"])
     autoregressor = MultiDirectionalPixelCNN(arguments["cpc_code_size"],
                                              multi_directional=arguments["cpc_multi_directional"])
 
@@ -406,7 +406,7 @@ def test_cpc(arguments, device):
 
     # If 16 bit precision is being used change the model and optimisers precision.
     if arguments["precision"] == 16:
-        [encoder, autoregressor] = amp.initialize([encoder, autoregressor], opt_lebel="O2", verbosity=False)
+        [encoder, autoregressor] = amp.initialize([encoder, autoregressor], opt_level="O2", verbosity=False)
 
     # Checks if precision level is supported and if not defaults to 32.
     elif arguments["precision"] != 32:
