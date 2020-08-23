@@ -206,7 +206,7 @@ class MultiDirectionalPixelCNN(nn.Module):
 
         # Defies the output block for the PixelCNN.
         self.out = nn.Sequential(nn.ReLU(),
-                                 nn.Conv2d(1024 if multi_directional else 252, 1024, kernel_size=1, stride=1, padding=0),
+                                 nn.Conv2d(1024 if multi_directional else 256, 1024, kernel_size=1, stride=1, padding=0),
                                  nn.BatchNorm2d(1024),
                                  nn.ReLU(),
                                  nn.Conv2d(1024, n_channels, kernel_size=1, stride=1, padding=0))
