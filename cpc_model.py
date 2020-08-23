@@ -42,6 +42,9 @@ class Encoder(nn.Module):
         :param imagenet: If ImageNet weights should be used to initilise the model.
         """
 
+        # Calls the super for the nn.Module.
+        super(Encoder, self).__init__()
+
         # Loads the ResNeXt Model from PyTorch.
         self.model = torch.hub.load("pytorch/vision:v0.5.0", "resnext101_32x8d", pretrained=imagenet)
 
@@ -181,7 +184,7 @@ class MultiDirectionalPixelCNN(nn.Module):
         :param multi_directional: Boolean for if the Multi-Directional PixelCNN should be used.
         """
 
-        # Calls the super for the nn.Conv2d.
+        # Calls the super for the nn.Module.
         super(MultiDirectionalPixelCNN, self).__init__()
 
         # Stores the boolean if multi directional pixel should be used.
