@@ -308,6 +308,10 @@ def train_cpc(arguments, device):
                 validation_loss += torch.mean(torch.cat(batch_losses))
                 validation_batches += 1
 
+                # Stops the epoch early if specified.
+                if validation_batches == arguments["batches_per_epoch"]:
+                    break
+
         # Writes the validation loss to TensorBoard
         if arguments["tensorboard"]:
             writer.add_scalar("Loss/validation", validation_loss / validation_batches, epoch)
@@ -494,6 +498,10 @@ def test_cpc(arguments, device):
             # Combines the loss for each image into a batch loss.
             loss += torch.mean(torch.cat(batch_losses))
             num_batches += 1
+
+            # Stops the epoch early if specified.
+            if num_batches == arguments["batches_per_epoch"]:
+                break
 
     # Gets the testing loss from the batch losses.
     loss /= num_batches

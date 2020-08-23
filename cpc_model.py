@@ -66,7 +66,7 @@ class Encoder(nn.Module):
         x = self.model.conv1(x)
         x = self.model.bn1(x)
         x = self.model.relu(x)
-        x = self.maxpool(x)
+        x = self.model.maxpool(x)
 
         x = self.model.layer1(x)
         x = self.model.layer2(x)
@@ -226,7 +226,7 @@ class MultiDirectionalPixelCNN(nn.Module):
                              nn.BatchNorm2d(h),
                              nn.ReLU(),
                              nn.Conv2d(h, 2 * h, 1),
-                             nn.BatchNorm2d(2 * 2))
+                             nn.BatchNorm2d(2 * h))
 
     def multi_directional_masked_block(self, n_channels, h, mask_type):
         """
