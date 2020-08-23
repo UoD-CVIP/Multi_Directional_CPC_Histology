@@ -2,7 +2,7 @@
 
 """
 The file contains the implementations of the models used for the Multi-Directional Contrastive Predictive Coding.
-    EfficientNetEncoder - Class for defining an encoder based on EfficientNet.
+    Encoder - Class for defining an encoder based on ResNeXt101.
     MaskedConv2D - Class to define a masked convolutional layer.
     MultiDirectionalPixelCNN - Class for defining a PixelCNN autoregressor with optional multi-directional.
 """
@@ -14,7 +14,6 @@ import os
 # Library Imports
 import torch
 import torch.nn as nn
-from efficientnet_pytorch import EfficientNet
 
 
 __author__ = "Jacob Carse"
@@ -27,53 +26,61 @@ __email__ = "j.carse@dundee.ac.uk"
 __status__ = "Development"
 
 
-class EfficientNetEncoder(nn.Module):
+class Encoder(nn.Module):
     """
-    Class for the EfficientNet encoder model, containing the methods:
+    Class for the Encoder model, containing the methods:
         init - Initialiser for the model.
         forward - Forward propagation for the encoder model.
         save_model - Method for saving the model.
     """
 
-    def __init__(self, b, pretraining, code_size):
+    def __init__(self, code_size, image_size=96, imagenet=False):
         """
         Initialiser for the model that initialises hte models layers.
-        :param b: The compound coefficient for the EfficientNet model.
-        :param pretraining: The type of pretraining to use.
         :param code_size: The size of the output feature vectors.
+        :param image_size: The size of each dimension of the input image.
+        :param imagenet: If ImageNet weights should be used to initilise the model.
         """
 
-        # Calls the super for the nn.Module.
-        super(EfficientNetEncoder, self).__init__()
-
-        # Loads the model with pretaining if selected.
-        if pretraining == "imagenet":
-            self.encoder = EfficientNet.from_pretrained(f"efficientnet-b{b}")
-        else:
-            self.encoder = EfficientNet.from_name(f"efficientnet-b{b}")
-
-        # Pools the encoder outputs to a one dimensional array.
-        self.encoder_pool = nn.AdaptiveAvgPool2d(1)
+        # Loads the ResNeXt Model from PyTorch.
+        self.model = torch.hub.load("pytorch/vision:v0.5.0", "resnext101_32x8d", pretrained=imagenet)
 
         # Gets the output dimensions of the encoder output.
         with torch.no_grad():
-            temp_input = torch.zeros(1, 3, 96, 96)
-            encoder_size = self.encoder.extract_features(temp_input).shape[1]
+            temp_input = torch.zeros(1, 3, image_size, image_size)
+            encoder_size = self.forward_features(temp_input).shape[1]
 
         # Initialises the code head for outputting feature vector.
         self.code_out = nn.Linear(encoder_size, code_size)
 
-    def forward(self, x):
+    def forward_features(self, x):
         """
-        Performs forward propagation with then EfficientNet encoder.
+        Forward propagates an input to output features for the ResNeXt encoder.
         :param x: PyTorch Tensor for the input image batch.
         :return: Feature vector output of the encoder.
         """
 
-        # Performs feature extraction with the encoder model.
-        x = self.encoder.extract_features(x)
-        x = self.encoder_pool(x)
-        x = x.view(x.shape[0], -1)
+        x = self.model.conv1(x)
+        x = self.model.bn1(x)
+        x = self.model.relu(x)
+        x = self.maxpool(x)
+
+        x = self.model.layer1(x)
+        x = self.model.layer2(x)
+        x = self.model.layer3(x)
+        x = self.model.layer4(x)
+
+        x = self.model.avgpool(x)
+        return torch.flatten(x, 1)
+
+    def forward(self, x):
+        """
+        Performs forward propagation with then encoder.
+        :param x: PyTorch Tensor for the input image batch.
+        :return: Feature vector equal to code size.
+        """
+
+        x = self.forward_features(x)
         return self.code_out(x)
 
     def save_model(self, path, name, epoch=None):

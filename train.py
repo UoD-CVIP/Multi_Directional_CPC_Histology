@@ -78,7 +78,7 @@ def train_cpc(arguments, device):
     log(arguments, "Loaded Datasets")
 
     # Initialises the encoder and autoregressor.
-    encoder = EfficientNetEncoder(arguments["efficient_net_b"], None, arguments["cpc_code_size"])
+    encoder = Encoder(arguments["cpc_code_size"], arguments["image_size"])
     autoregressor = MultiDirectionalPixelCNN(arguments["cpc_code_size"],
                                              multi_directional=arguments["cpc_multi_directional"])
 
@@ -386,7 +386,7 @@ def test_cpc(arguments, device):
     log(arguments, "Loaded Testing Data")
 
     # Initialises the encoder and autoregressor.
-    encoder = EfficientNetEncoder(arguments["efficient_net_b"], None, arguments["cpc_code_size"])
+    encoder = Encoder(arguments["cpc_code_size"], arguments["image_size"])
     autoregressor = MultiDirectionalPixelCNN(arguments["cpc_code_size"],
                                              multi_directional=arguments["cpc_multi_directional"])
 

@@ -95,9 +95,6 @@ def load_arguments(description):
     argument_parser.add_argument("--learning_rate", type=float,
                                  default=float(config_parser["model"]["learning_rate"]),
                                  help="Floating point value for the learning rate used to train the model.")
-    argument_parser.add_argument("--efficient_net_b", type=int,
-                                 default=int(config_parser["model"]["efficient_net_b"]),
-                                 help="Integer for the compound coefficient for EfficientNet encoder.")
 
     # Dataset Arguments
     argument_parser.add_argument("--val_split", type=float,
