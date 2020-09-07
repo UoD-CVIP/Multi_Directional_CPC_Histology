@@ -216,7 +216,8 @@ def train_cpc(arguments, device):
                 log(arguments, "Time: {}s\tTrain Epoch: {} [{}/{}] ({:.0f}%)]\tLoss: {:.6f}".format(
                     str(int(time.time() - start_time)).rjust(6, '0'), str(epoch).rjust(2, '0'),
                     str(num_batches * arguments["batch_size"]).rjust(len(str(len(train_data))), '0'),
-                    len(train_data), 100. * num_batches / len(train_data), epoch_loss / num_batches
+                    len(train_data), 100. * num_batches / (len(train_data) / arguments["batch_size"]),
+                    epoch_loss / num_batches
                 ))
 
             # Stops the epoch early if specified.
