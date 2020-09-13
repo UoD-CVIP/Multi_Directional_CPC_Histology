@@ -3,6 +3,7 @@
 """
 This file contains the function to read arguments from a config file and command line.
     load_arguments - Function to load arguments from the config file and command line.
+    print_arguments - Function to print the name and value for each loaded argument.
 """
 
 

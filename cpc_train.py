@@ -21,7 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 # Own Modules Imports
 from utils import *
 from dataset import *
-from cpc_model import *
+from models import *
 
 
 __author__ = "Jacob Carse"

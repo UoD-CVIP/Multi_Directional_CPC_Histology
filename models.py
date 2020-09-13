@@ -30,13 +30,14 @@ class Encoder(nn.Module):
     """
     Class for the Encoder model, containing the methods:
         init - Initialiser for the model.
+        forward_features - Forward propagation for the features of the encoder model.
         forward - Forward propagation for the encoder model.
         save_model - Method for saving the model.
     """
 
     def __init__(self, code_size, image_size=96, imagenet=False):
         """
-        Initialiser for the model that initialises hte models layers.
+        Initialiser for the model that initialises the models layers.
         :param code_size: The size of the output feature vectors.
         :param image_size: The size of each dimension of the input image.
         :param imagenet: If ImageNet weights should be used to initilise the model.
@@ -103,6 +104,13 @@ class Encoder(nn.Module):
             torch.save(self.state_dict(), os.path.join(path, f"{name}_encoder_{str(epoch)}.pt"))
         else:
             torch.save(self.state_dict(), os.path.join(path, f"{name}_encoder.pt"))
+
+
+        # Saves the model to the save directory.
+        if epoch is not None:
+            torch.save(self.state_dict(), os.path.join(path, f"{name}_classifier_{str(epoch)}.pt"))
+        else:
+            torch.save(self.state_dict(), os.path.join(path, f"{name}_classifier.pt"))
 
 
 class MaskedConv2D(nn.Conv2d):

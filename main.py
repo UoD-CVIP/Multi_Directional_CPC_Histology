@@ -8,7 +8,7 @@ This file loads the arguments, sets random seed and runs a selected task.
 
 
 # Own Module Import
-from train import *
+from cpc_train import *
 from utils import *
 from config import *
 
