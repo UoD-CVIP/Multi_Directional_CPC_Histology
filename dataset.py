@@ -77,6 +77,7 @@ class Dataset(data.Dataset):
         get_item - Gets a image and label from the dataset based on a given index.
         augment - Applies augmentations to the image and converts it to a tensor.
         get_validation_set - Splits the dataset into training and validation.
+        reduce_size - Reduces the size of the training set.
     """
 
     def __init__(self, arguments, mode, filenames=None, labels=None):
@@ -196,3 +197,17 @@ class Dataset(data.Dataset):
 
         # Returns a Dataset object with the shuffled data.
         return Dataset(self.arguments, self.mode, shuffled_data, shuffled_labels)
+
+    def reduce_size(self, reduction_size):
+        """
+        Reduces the size of the dataset.
+        :param reduction_size: The dataset size to be reduced to.
+        """
+
+        # Checks if reduction_size is an acceptable size.
+        if reduction_size > len(self.filenames) or reduction_size < 1:
+            reduction_size = len(self.filenames)
+
+        # Reduces the dataset.
+        _, self.filenames, _, self.labels = train_test_split(self.filenames, self.labels,
+                                                             test_size=reduction_size, stratify=self.labels)
