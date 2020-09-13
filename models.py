@@ -106,6 +106,45 @@ class Encoder(nn.Module):
             torch.save(self.state_dict(), os.path.join(path, f"{name}_encoder.pt"))
 
 
+class Classifier(nn.Module):
+    def __init__(self, feature_size, num_classes):
+        """
+        Initialiser for the model that initialises the models layers.
+        :param feature_size: The size of the input feature vectors.
+        :param num_classes: The number of classes the features can be classified as.
+        """
+
+        # Calls the super for the nn.Module.
+        super(Classifier, self).__init__()
+
+        # Hidden layer.
+        self.liner = nn.Linear(feature_size, 512)
+
+        # Output layer.
+        self.out = nn.Linear(512, num_classes)
+
+    def forward(self, x):
+        """
+        Performs forward propagation with then classifier.
+        :param x: PyTorch Tensor for the input image batch.
+        :return: Feature vector equal to code size.
+        """
+
+        x = self.liner(x)
+        return self.out(x)
+
+    def save_model(self, path, name, epoch=None):
+        """
+        Method for saving the classifier model.
+        :param path: Directory path to save the classifier.
+        :param name: The name of the experiment to be saved.
+        :param epoch: Integer for the current epoch to be included in the save name.
+        """
+
+        # Checks if the save directory exists and if not creates it.
+        if not os.path.isdir(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
         # Saves the model to the save directory.
         if epoch is not None:
             torch.save(self.state_dict(), os.path.join(path, f"{name}_classifier_{str(epoch)}.pt"))
