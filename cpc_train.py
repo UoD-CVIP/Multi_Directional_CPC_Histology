@@ -20,8 +20,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 # Own Modules Imports
 from utils import *
-from dataset import *
 from models import *
+from dataset import *
 
 
 __author__ = "Jacob Carse"
@@ -39,7 +39,7 @@ def train_cpc(arguments, device):
     Function used to train the Multi-Directional Contrastive Predictive Coding model.
     :param arguments: Dictionary containing arguments.
     :param device: PyTorch device object.
-    :return Returns the lists of training and validation losses and an integer for the best performing epoch.
+    :return: Returns lists of training and validation losses and an integer for the best performing epoch.
     """
 
     # Loads a TensorBoard Summary Writer.
@@ -365,7 +365,7 @@ def test_cpc(arguments, device):
     Function used to test a trained Multi-Directional Contrastive Predictive Coding model.
     :param arguments: Dictionary containing arguments.
     :param device: PyTorch device object.
-    :return Returns the loss for the testing data on the model.
+    :return: Returns the loss for the testing data on the model.
     """
 
     # Loads the testing dataset.

@@ -107,21 +107,22 @@ class Encoder(nn.Module):
 
 
 class Classifier(nn.Module):
-    def __init__(self, feature_size, num_classes):
+    def __init__(self, feature_size, num_classes, hidden_layer):
         """
         Initialiser for the model that initialises the models layers.
         :param feature_size: The size of the input feature vectors.
         :param num_classes: The number of classes the features can be classified as.
+        :param hidden_layer: The size of the hidden layer
         """
 
         # Calls the super for the nn.Module.
         super(Classifier, self).__init__()
 
         # Hidden layer.
-        self.liner = nn.Linear(feature_size, 512)
+        self.liner = nn.Linear(feature_size, hidden_layer)
 
         # Output layer.
-        self.out = nn.Linear(512, num_classes)
+        self.out = nn.Linear(hidden_layer, num_classes)
 
     def forward(self, x):
         """

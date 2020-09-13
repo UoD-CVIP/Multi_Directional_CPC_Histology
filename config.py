@@ -145,6 +145,14 @@ def load_arguments(description):
                                  default=config_parser["cpc"]["cpc_multi_directional"].lower() == "true",
                                  help="Boolean if the contrastive predictive coding should be multi directional.")
 
+    # Convolutional Neural Network Arguments
+    argument_parser.add_argument("--hidden_layer", type=int,
+                                 default=int(config_parser["cnn"]["hidden_layer"]),
+                                 help="Integer for the size of the hidden layer in the CNN classifier.")
+    argument_parser.add_argument("--training_examples", type=int,
+                                 default=int(config_parser["cnn"]["training_examples"]),
+                                 help="Integer for the number of training examples to train the CNN.")
+
     # Debug Arguments
     argument_parser.add_argument("--batches_per_epoch", type=int,
                                  default=int(config_parser["debug"]["batches_per_epoch"]),
