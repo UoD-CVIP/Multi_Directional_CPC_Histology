@@ -322,7 +322,7 @@ def train_cpc(arguments, device):
         validation_losses.append(validation_loss / validation_batches)
 
         # Logs the epoch information.
-        log(arguments, "\nEpoch: {}\tLoss{:.6f}\tValidation Loss: {:.6f}\n\n".
+        log(arguments, "\nEpoch: {}\tLoss: {:.6f}\tValidation Loss: {:.6f}\n\n".
             format(epoch, losses[-1], validation_losses[-1]))
 
         # Adds the total number of batches.
@@ -335,13 +335,12 @@ def train_cpc(arguments, device):
             encoder.save_model(arguments["model_dir"], arguments["experiment"], "best")
             autoregressor.save_model(arguments["model_dir"], arguments["experiment"], "best")
 
-        # Saves the models with reference to the current epoch
+        # Saves the models with reference to the current epoch.
         encoder.save_model(arguments["model_dir"], arguments["experiment"], epoch)
         autoregressor.save_model(arguments["model_dir"], arguments["experiment"], epoch)
 
         # Checks if training has performed the minimum number of epochs.
         if epoch >= arguments["min_epochs"]:
-
             # Calculates the generalised validation loss.
             g_loss = 100 * ((validation_losses[-1] / min(validation_losses[:-1])) - 1)
 

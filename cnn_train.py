@@ -161,7 +161,85 @@ def train_cnn(arguments, device):
             if num_batches == arguments["batches_per_epoch"]:
                 break
 
+        # Adds the number of batches to total number.
+        total_batches += num_batches
+
         # Writes the epoch loss to TensorBoard.
         if arguments["tensorboard"]:
             writer.add_scalar("Loss/train", epoch_loss / num_batches, epoch)
             writer.add_scalar("Accuracy/train", epoch_acc / num_batches, epoch)
+
+        # Performs a validation epoch with no gradients.
+        with torch.no_grad():
+            # Logging metrics for validation epoch.
+            validation_acc, validation_loss, validation_batches = 0, 0, 0
+
+            for images, labels in validation_data_loader:
+                # Loads the batch into memory and splits the batch into patches.
+                images = images.to(device)
+
+                # Encodes the images with the encoder.
+                encoded_images = encoder.forward_features(images)
+
+                # Classifies the encoded images.
+                predictions = classifier.forward(encoded_images)
+
+                # Calculates the batch accuracy.
+                batch_acc = (predictions.max(dim=1)[1] == labels).sum()
+
+                # Finds the loss of the batch using the predictions.
+                loss = F.cross_entropy(predictions, labels.type(torch.long))
+
+                # Adds the batch loss and accuracy to the epoch loss and accuracy and updates the number of batches.
+                validation_batches += 1
+                validation_loss += loss
+                validation_acc += batch_acc
+
+                # Stops the epoch early if specified.
+                if num_batches == arguments["batches_per_epoch"]:
+                    break
+
+        # Writes the epoch loss to TensorBoard.
+        if arguments["tensorboard"]:
+            writer.add_scalar("Loss/validation", validation_loss / validation_batches, epoch)
+            writer.add_scalar("Accuracy/validation", validation_acc / validation_batches, epoch)
+
+        # Adds the training and validation losses to lists of losses.
+        losses.append(epoch_loss / num_batches)
+        validation_losses.append(validation_loss / validation_batches)
+
+        # Logs the epoch information.
+        log(arguments, "\nEpoch: {}\Training Loss: {:.6f}\tTraining Accuracy: {:.6f}\t"
+                       "Validation Loss: {:.6f}\tValidation Accuracy: {:.6f}".
+            format(epoch, losses[-1], epoch_acc / num_batches,
+                   validation_losses[-1], validation_acc / validation_batches))
+
+        # Checks if the validation loss is the best achieved loss and saves the model.
+        if validation_losses[-1] < best_loss:
+            best_loss = validation_losses[-1]
+            best_epoch = epoch
+            encoder.save_model(arguments["model_dir"], arguments["experiment"], "best")
+            classifier.save_model(arguments["model_dir"], arguments["experiment"], "best")
+
+        # Saves the models with reference to the current epoch.
+        encoder.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+        classifier.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+
+        # Checks if training has performed the minimum number of epochs.
+        if epoch >= arguments["min_epochs"]:
+            # Calculates the generalised validation loss.
+            g_loss = 100 * ((validation_losses[-1] / min(validation_losses[:-1])) - 1)
+
+            # Calculates the training progress using a window over the training losses.
+            t_progress = 1000 * ((sum(losses[-(arguments["window"] + 1): - 1]) /
+                                  (arguments["window"] * min(losses[-(arguments["window"] + 1): - 1]))) - 1)
+
+            # Compares the generalised loss and training progress against a selected target value.
+            if g_loss / t_progress > arguments["target"]:
+                break
+
+    # Logs that the training has finished.
+    log(arguments, f"\n\nTraining finished after {epoch} epochs in {int(time.time() - start_time)}s")
+    
+    # Returns the loss values from the training.
+    return losses, validation_losses, best_epoch
