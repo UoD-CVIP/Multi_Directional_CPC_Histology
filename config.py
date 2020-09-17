@@ -146,6 +146,9 @@ def load_arguments(description):
                                  help="Boolean if the contrastive predictive coding should be multi directional.")
 
     # Convolutional Neural Network Arguments
+    argument_parser.add_argument("--pretrained", type=str,
+                                 default=config_parser["cnn"]["pretrained"],
+                                 help="String for the pretrained weights to be loaded. 'none', 'imagenet' or 'cpc'")
     argument_parser.add_argument("--hidden_layer", type=int,
                                  default=int(config_parser["cnn"]["hidden_layer"]),
                                  help="Integer for the size of the hidden layer in the CNN classifier.")

@@ -52,10 +52,10 @@ class Encoder(nn.Module):
         # Gets the output dimensions of the encoder output.
         with torch.no_grad():
             temp_input = torch.zeros(1, 3, image_size, image_size)
-            encoder_size = self.forward_features(temp_input).shape[1]
+            self.encoder_size = self.forward_features(temp_input).shape[1]
 
         # Initialises the code head for outputting feature vector.
-        self.code_out = nn.Linear(encoder_size, code_size)
+        self.code_out = nn.Linear(self.encoder_size, code_size)
 
     def forward_features(self, x):
         """

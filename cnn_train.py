@@ -12,6 +12,10 @@ import os
 import time
 
 # Library Imports
+import torch
+from apex import amp
+from torch import optim
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 # Own Modules Imports
@@ -56,3 +60,39 @@ def train_cnn(arguments, device):
     validation_data_loader = DataLoader(validation_data, batch_size=arguments["batch_size"],
                                           shuffle=False, num_workers=arguments["data_workers"],
                                           pin_memory=False, drop_last=True)
+
+    log(arguments, "Loaded Datasets")
+
+    # Initialises the encoder and autoregressor.
+    encoder = Encoder(0, arguments["image_size"], imagenet=arguments["pretrained"].lower() == "imagenet")
+    classifier = Classifier(encoder.encoder_size, 10, arguments["hidden_layer"])
+
+    # Loads weights from pretrained Contrastive Predictive Coding model.
+    if arguments["pretrained"].lower() == "cpc":
+        encoder_path = os.path.join(arguments["model_dir"], f"{arguments['experiment']}_encoder_best.pt")
+        encoder.load_state_dict(torch.load(encoder_path, map_location=device), strict=False)
+
+    # Sets the models to training mode.
+    encoder.train()
+    classifier.train()
+
+    # Moves the models to the selected device.
+    encoder.to(device)
+    classifier.to(device)
+
+    # Combines the parameters from the two models.
+    parameters = list(encoder.parameters()) + list(classifier.parameters())
+
+    # Initialises a optimiser used to optimise the parameters of the models.
+    optimiser = optim.Adam(params=parameters, lr=arguments["learning_rate"])
+
+    # If 16 bit precision is being used change the model and optimiser precision.
+    if arguments["precision"] == 16:
+        [encoder, classifier], optimiser = amp.initialize([encoder, classifier], optimiser,
+                                                          opt_level="O2", verbosity=False)
+
+    # Checks if precision level is supported and if not defaults to 32.
+    elif arguments["precision"] != 32:
+        log(arguments, "Only 16 and 32 bit precision supported. Defaulting to 32 bit precision.")
+
+    log(arguments, "Models Initialised")
