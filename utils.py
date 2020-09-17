@@ -94,7 +94,7 @@ def set_random_seed(seed):
 def get_device(arguments):
     """
     Sets the Default GPU that the device will use for training and testing.
-    :param arguments: A Dictonary of arguments.
+    :param arguments: A Dictionary of arguments.
     :return: A PyTorch device.
     """
 
@@ -102,7 +102,7 @@ def get_device(arguments):
     if arguments["gpu"] > 0 and not torch.cuda.is_available():
         return torch.device("cpu")
 
-    # Sets the GPU device to perfered device and checks if available.
+    # Sets the GPU device to preferred device and checks if available.
     else:
         if arguments["gpu"] > torch.cuda.device_count() - 1:
             return torch.device(f"cuda:{torch.cuda.device_count() - 1}")

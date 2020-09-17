@@ -40,7 +40,7 @@ class Encoder(nn.Module):
         Initialiser for the model that initialises the models layers.
         :param code_size: The size of the output feature vectors.
         :param image_size: The size of each dimension of the input image.
-        :param imagenet: If ImageNet weights should be used to initilise the model.
+        :param imagenet: If ImageNet weights should be used to initialise the model.
         """
 
         # Calls the super for the nn.Module.
@@ -156,13 +156,13 @@ class Classifier(nn.Module):
 class MaskedConv2D(nn.Conv2d):
     """
     Convolutional Layer that applies a mask to the weights of the convolutional kernel, containing methods:
-        init - Initiliser for the masked convolutional layer.
+        init - Initialiser for the masked convolutional layer.
         forward - Method for forward propagation of the model.
     """
 
     def __init__(self, mask_type, rotation, c_in, c_out, k_size, stride, pad):
         """
-        Initiliser for the masked convolutonal layer.
+        Initialiser for the masked convolutonal layer.
         :param mask_type: The type of the mask either A or B.
         :param rotation: Integer for the number of degrees the mask should be rotated.
         :param c_in: Integer for the number of input channels.
@@ -217,7 +217,7 @@ class MaskedConv2D(nn.Conv2d):
 class MultiDirectionalPixelCNN(nn.Module):
     """
     Class for the Multi-Directional Autoregressor model, containing the methods:
-        init - Initiliser for the Multi-Directional PixelCNN.
+        init - Initialiser for the Multi-Directional PixelCNN.
         masked_block - Method to define a block with a Masked Convolutional layer.
         multi_directional_masked_block - Method to define a multi directional block with a Masked Convolutional layer.
         forward - Method for forward propagating the model.
@@ -226,7 +226,7 @@ class MultiDirectionalPixelCNN(nn.Module):
 
     def __init__(self, n_channels, h=128, multi_directional=True):
         """
-        The initiliser for the Multi-Directional PixelCNN.
+        The initialiser for the Multi-Directional PixelCNN.
         :param n_channels: Integer for the number of input channels.
         :param h: Integer for the size fo the hidden layers in the PixelCNN.
         :param multi_directional: Boolean for if the Multi-Directional PixelCNN should be used.

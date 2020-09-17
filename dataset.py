@@ -72,7 +72,7 @@ def extract_patches(arguments, images, num_patches):
 class Dataset(data.Dataset):
     """
     Class for the handling and loading of images and labels.
-        init - Initiliser for the class used to load an array of filenames and labels.
+        init - Initialiser for the class used to load an array of filenames and labels.
         len - Gets the length of the dataset.
         get_item - Gets a image and label from the dataset based on a given index.
         augment - Applies augmentations to the image and converts it to a tensor.
@@ -82,8 +82,8 @@ class Dataset(data.Dataset):
 
     def __init__(self, arguments, mode, filenames=None, labels=None):
         """
-        Initiliser for the class that loads an array of filenames and labels for the dataset.
-        :param arguments: Dictonary containing, 'dataset_dir', 'augmentation', 'float16' and 'validation_split'.
+        Initialiser for the class that loads an array of filenames and labels for the dataset.
+        :param arguments: Dictionary containing, 'dataset_dir', 'augmentation', 'float16' and 'validation_split'.
         :param mode: String specifying the mode of data to be loaded, 'train', 'validation' and 'test'.
         :param filenames: NumPy array of filenames, used if the mode is specified as validation.
         :param labels: NumPy array of labels, used if the mode is specified as validation.

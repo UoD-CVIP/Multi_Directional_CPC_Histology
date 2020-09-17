@@ -108,9 +108,9 @@ def train_cpc(arguments, device):
     log(arguments, "Models Initialised")
 
     # Main logging variables declared.
+    start_time = time.time()
     losses, validation_losses = [], []
     best_loss, best_epoch, total_batches = 1e10, 0, 0
-    start_time = time.time()
 
     log(arguments, "Training Timer Started\n")
 
@@ -204,8 +204,8 @@ def train_cpc(arguments, device):
             optimiser.zero_grad()
 
             # Adds the batch loss to the epoch loss and updates the number of batches.
-            epoch_loss += loss.item()
             num_batches += 1
+            epoch_loss += loss.item()
 
             # Writes the batch loss to TensorBoard.
             if arguments["tensorboard"]:
@@ -306,8 +306,8 @@ def train_cpc(arguments, device):
                     batch_losses.append(-log_softmax[0,])
 
                 # Combines the loss for each image into a batch loss
-                validation_loss += torch.mean(torch.cat(batch_losses))
                 validation_batches += 1
+                validation_loss += torch.mean(torch.cat(batch_losses))
 
                 # Stops the epoch early if specified.
                 if validation_batches == arguments["batches_per_epoch"]:
@@ -497,8 +497,8 @@ def test_cpc(arguments, device):
                 batch_losses.append(-log_softmax[0,])
 
             # Combines the loss for each image into a batch loss.
-            loss += torch.mean(torch.cat(batch_losses))
             num_batches += 1
+            loss += torch.mean(torch.cat(batch_losses))
 
             # Stops the epoch early if specified.
             if num_batches == arguments["batches_per_epoch"]:

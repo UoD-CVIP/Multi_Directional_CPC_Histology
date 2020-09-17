@@ -15,6 +15,7 @@ import time
 import torch
 from apex import amp
 from torch import optim
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -65,7 +66,7 @@ def train_cnn(arguments, device):
 
     # Initialises the encoder and autoregressor.
     encoder = Encoder(0, arguments["image_size"], imagenet=arguments["pretrained"].lower() == "imagenet")
-    classifier = Classifier(encoder.encoder_size, 10, arguments["hidden_layer"])
+    classifier = Classifier(encoder.encoder_size, 2, arguments["hidden_layer"])
 
     # Loads weights from pretrained Contrastive Predictive Coding model.
     if arguments["pretrained"].lower() == "cpc":
@@ -96,3 +97,71 @@ def train_cnn(arguments, device):
         log(arguments, "Only 16 and 32 bit precision supported. Defaulting to 32 bit precision.")
 
     log(arguments, "Models Initialised")
+
+    # Main logging variables declared.
+    start_time = time.time()
+    losses, validation_losses = [], []
+    best_loss, best_epoch, total_batches = 1e10, 0, 0
+
+    log(arguments, "Training Timer Started\n")
+
+    # The beginning of the main training loop.
+    for epoch in range(1, arguments["max_epochs"] + 1):
+        epoch_acc, epoch_loss, num_batches = 0, 0, 0
+
+        # Loops through the dataset by each batch.
+        for images, labels in training_data_loader:
+
+            # Loads the batch into memory and splits the batch into patches.
+            images = images.to(device)
+
+            # Encodes the images with the encoder.
+            encoded_images = encoder.forward_features(images)
+
+            # Classifies the encoded images.
+            predictions = classifier.forward(encoded_images)
+
+            # Calculates the batch accuracy.
+            batch_acc = (predictions.max(dim=1)[1] == labels).sum()
+
+            # Finds the loss of the batch using the predictions.
+            loss = F.cross_entropy(predictions, labels.type(torch.long))
+
+            # Backward propagates the loss over the model.
+            if arguments["precision"] == 16:
+                with amp.scale_loss(loss, optimiser) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
+
+            # Updates the weights of the optimiser using the back propagated loss.
+            optimiser.step()
+            optimiser.zero_grad()
+
+            # Adds the batch loss to the epoch loss and updates the number of batches.
+            num_batches += 1
+            epoch_acc += batch_acc
+            epoch_loss += loss.item()
+
+            # Writes the batch loss to TensorBoard
+            if arguments["tensorboard"]:
+                writer.add_scalar("Loss/batch", loss.item(), num_batches + total_batches)
+                writer.add_scalar("Accuracy/batch", batch_acc, num_batches + total_batches)
+
+            # Logs the details of the training batch.
+            if num_batches % arguments["log_intervals"] == 0:
+                log(arguments, "Time: {}s\tTrain Epoch: {} [{}/{}] ({:.0f}%)]\tLoss: {:.6f}\tAccuracy: {:.6f}".format(
+                    str(int(time.time() - start_time)).rjust(6, '0'), str(epoch).rjust(2, '0'),
+                    str(num_batches * arguments["batch_size"]).rjust(len(str(len(train_data))), '0'),
+                    len(train_data), 100. * num_batches / (len(train_data) / arguments["batch_size"]),
+                    epoch_loss / num_batches, epoch_acc / num_batches
+                ))
+
+            # Stops the epoch early if specified.
+            if num_batches == arguments["batches_per_epoch"]:
+                break
+
+        # Writes the epoch loss to TensorBoard.
+        if arguments["tensorboard"]:
+            writer.add_scalar("Loss/train", epoch_loss / num_batches, epoch)
+            writer.add_scalar("Accuracy/train", epoch_acc / num_batches, epoch)
