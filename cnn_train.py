@@ -240,6 +240,10 @@ def train_cnn(arguments, device):
 
     # Logs that the training has finished.
     log(arguments, f"\n\nTraining finished after {epoch} epochs in {int(time.time() - start_time)}s")
-    
+
     # Returns the loss values from the training.
     return losses, validation_losses, best_epoch
+
+
+def test_cnn(arguments, device):
+    pass

@@ -8,9 +8,10 @@ This file loads the arguments, sets random seed and runs a selected task.
 
 
 # Own Module Import
-from cpc_train import *
 from utils import *
 from config import *
+from cnn_train import *
+from cpc_train import *
 
 
 __author__ = "Jacob Carse"
@@ -51,3 +52,20 @@ if __name__ == "__main__":
     # Tests a Contrastive Predictive Coding Model.
     elif arguments["task"].lower() == "test_cpc":
         test_cpc(arguments, device)
+
+    # Trains and Tests a Convolutional Neural Network model.
+    elif arguments["task"].lower() == "cnn":
+        train_cnn(arguments, device)
+        test_cnn(arguments, device)
+
+    # Trains a Convolutional Neural Network Model.
+    elif arguments["task"].lower() == "train_cnn":
+        train_cnn(arguments, device)
+
+    # Tests a Convolutional Neural Network Model.
+    elif arguments["task"].lower() == "test_cnn":
+        test_cnn(arguments, device)
+
+    # If no valid argument was presented.
+    else:
+        log(arguments, "Enter a valid task, 'cpc', 'train_cpc', 'test_cpc', 'cnn', train_cnn' or 'test_cnn'.")
