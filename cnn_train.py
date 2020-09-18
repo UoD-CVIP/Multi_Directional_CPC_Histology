@@ -218,12 +218,12 @@ def train_cnn(arguments, device):
         if validation_losses[-1] < best_loss:
             best_loss = validation_losses[-1]
             best_epoch = epoch
-            encoder.save_model(arguments["model_dir"], arguments["experiment"], "best")
-            classifier.save_model(arguments["model_dir"], arguments["experiment"], "best")
+            encoder.save_model(arguments["model_dir"], arguments["experiment"], "cnn_best")
+            classifier.save_model(arguments["model_dir"], arguments["experiment"], "cnn_best")
 
         # Saves the models with reference to the current epoch.
-        encoder.save_model(arguments["model_dir"], arguments["experiment"], epoch)
-        classifier.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+        encoder.save_model(arguments["model_dir"], arguments["experiment"], f"cnn_{epoch}")
+        classifier.save_model(arguments["model_dir"], arguments["experiment"], f"cnn_{epoch}")
 
         # Checks if training has performed the minimum number of epochs.
         if epoch >= arguments["min_epochs"]:
@@ -246,4 +246,85 @@ def train_cnn(arguments, device):
 
 
 def test_cnn(arguments, device):
-    pass
+    """
+    Function used to test a trained Convolutional Neural Network model.
+    :param arguments: Dictionary containing arguments.
+    :param device: PyTorch device object.
+    :return: Returns the loss for the testing data on the model.
+    """
+
+    # Loads the testing dataset.
+    test_data = Dataset(arguments, "test")
+
+    # Creates the data loader for the testing data.
+    test_data_loader = DataLoader(test_data, batch_size=arguments["batch_size"],
+                                          shuffle=False, num_workers=arguments["data_workers"],
+                                          pin_memory=False, drop_last=True)
+
+    log(arguments, "Loaded Testing Data")
+
+    # Initialises the encoder and loads the trained weights.
+    encoder = Encoder(0, arguments["image_size"])
+    encoder_path = os.path.join(arguments["model_dir"], f"{arguments['experiment']}_encoder_cnn_best.pt")
+    encoder.load_state_dict(torch.load(encoder_path, map_location=device), strict=False)
+
+    # Initialises the classifier and loads the trained weights.
+    classifier = Classifier(encoder.encoder_size, 2, arguments["hidden_layer"])
+    classifier_path = os.path.join(arguments["model_dir"], f"{arguments['experiment']}_classifier_cnn_best.pt")
+    classifier.load_state_dict(torch.load(classifier_path, map_location=device), strict=False)
+
+    # Sets the models to evaluation mode.
+    encoder.eval()
+    classifier.eval()
+
+    # Moves the models to the selected device.
+    encoder.to(device)
+    classifier.to(device)
+
+    # If 16 bit precision is being used change the model precision.
+    if arguments["precision"] == 16:
+        [encoder, classifier] = amp.initialize([encoder, classifier], opt_level="O2", verbosity=False)
+
+    # Checks if precision level is supported and if not defaults to 32.
+    elif arguments["precision"] != 32:
+        log(arguments, "Only 16 and 32 bit precision supported. Defaulting to 32 bit precision.")
+
+    log(arguments, "Models Initialised")
+
+    # Performs a testing epoch with no gradients.
+    with torch.no_grad():
+        # Logging metrics for the testing epoch.
+        loss, accuracy, num_batches = 0, 0, 0
+
+        # Loops through the testing dataset.
+        for images, labels in test_data_loader:
+
+            # Loads the batch into memory and splits the batch into patches.
+            images = images.to(device)
+
+            # Encodes the images with the encoder.
+            encoded_images = encoder.forward_features(images)
+
+            # Classifiers the encoded images.
+            predictions = classifier.forward(encoded_images)
+
+            # Calculates the batch accuracy.
+            accuracy += (predictions.max(dim=1)[1] == labels).sum()
+
+            # Finds the loss of the batch using the predictions.
+            loss += F.cross_entropy(predictions, labels.type(torch.long)).item
+
+            # Updates the number of batches.
+            num_batches += 1
+
+            # Stops the epoch early if specified.
+            if num_batches == arguments["batches_per_epoch"]:
+                break
+
+    # Calculates the loss and accuracy of the epoch.
+    loss /= num_batches
+    accuracy /= num_batches
+
+    # Logs and returns the testing outputs.
+    log(arguments, "\nTesting Loss: {:.6f}\tTesting Accuracy: {:.6f}".format(loss, accuracy))
+    return loss, accuracy
