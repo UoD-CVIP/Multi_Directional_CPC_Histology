@@ -114,6 +114,7 @@ def train_cnn(arguments, device):
 
             # Loads the batch into memory and splits the batch into patches.
             images = images.to(device)
+            labels = labels.to(device)
 
             # Encodes the images with the encoder.
             encoded_images = encoder.forward_features(images)
@@ -177,6 +178,7 @@ def train_cnn(arguments, device):
             for images, labels in validation_data_loader:
                 # Loads the batch into memory and splits the batch into patches.
                 images = images.to(device)
+                labels = labels.to(device)
 
                 # Encodes the images with the encoder.
                 encoded_images = encoder.forward_features(images)
@@ -301,6 +303,7 @@ def test_cnn(arguments, device):
 
             # Loads the batch into memory and splits the batch into patches.
             images = images.to(device)
+            labels = labels.to(device)
 
             # Encodes the images with the encoder.
             encoded_images = encoder.forward_features(images)
@@ -312,7 +315,7 @@ def test_cnn(arguments, device):
             accuracy += (predictions.max(dim=1)[1] == labels).sum()
 
             # Finds the loss of the batch using the predictions.
-            loss += F.cross_entropy(predictions, labels.type(torch.long)).item
+            loss += F.cross_entropy(predictions, labels.type(torch.long)).item()
 
             # Updates the number of batches.
             num_batches += 1
