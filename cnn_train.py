@@ -57,10 +57,10 @@ def train_cnn(arguments, device):
     # Creates the data loaders for the training and validation data.
     training_data_loader = DataLoader(train_data, batch_size=arguments["batch_size"],
                                            shuffle=True, num_workers=arguments["data_workers"],
-                                           pin_memory=False, drop_last=True)
+                                           pin_memory=False, drop_last=False)
     validation_data_loader = DataLoader(validation_data, batch_size=arguments["batch_size"],
                                           shuffle=False, num_workers=arguments["data_workers"],
-                                          pin_memory=False, drop_last=True)
+                                          pin_memory=False, drop_last=False)
 
     log(arguments, "Loaded Datasets")
 
@@ -123,7 +123,7 @@ def train_cnn(arguments, device):
             predictions = classifier.forward(encoded_images)
 
             # Calculates the batch accuracy.
-            batch_acc = (predictions.max(dim=1)[1] == labels).sum()
+            batch_acc = (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
 
             # Finds the loss of the batch using the predictions.
             loss = F.cross_entropy(predictions, labels.type(torch.long))
@@ -187,7 +187,7 @@ def train_cnn(arguments, device):
                 predictions = classifier.forward(encoded_images)
 
                 # Calculates the batch accuracy.
-                batch_acc = (predictions.max(dim=1)[1] == labels).sum()
+                batch_acc = (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
 
                 # Finds the loss of the batch using the predictions.
                 loss = F.cross_entropy(predictions, labels.type(torch.long))
@@ -212,7 +212,7 @@ def train_cnn(arguments, device):
 
         # Logs the epoch information.
         log(arguments, "\nEpoch: {}\Training Loss: {:.6f}\tTraining Accuracy: {:.6f}\t"
-                       "Validation Loss: {:.6f}\tValidation Accuracy: {:.6f}".
+                       "Validation Loss: {:.6f}\tValidation Accuracy: {:.6f}\n\n".
             format(epoch, losses[-1], epoch_acc / num_batches,
                    validation_losses[-1], validation_acc / validation_batches))
 
@@ -261,7 +261,7 @@ def test_cnn(arguments, device):
     # Creates the data loader for the testing data.
     test_data_loader = DataLoader(test_data, batch_size=arguments["batch_size"],
                                           shuffle=False, num_workers=arguments["data_workers"],
-                                          pin_memory=False, drop_last=True)
+                                          pin_memory=False, drop_last=False)
 
     log(arguments, "Loaded Testing Data")
 
@@ -312,7 +312,7 @@ def test_cnn(arguments, device):
             predictions = classifier.forward(encoded_images)
 
             # Calculates the batch accuracy.
-            accuracy += (predictions.max(dim=1)[1] == labels).sum()
+            accuracy += (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
 
             # Finds the loss of the batch using the predictions.
             loss += F.cross_entropy(predictions, labels.type(torch.long)).item()
