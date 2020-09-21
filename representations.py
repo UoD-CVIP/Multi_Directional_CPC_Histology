@@ -11,6 +11,7 @@ import os
 import time
 
 # Library Imports
+from apex import amp
 from torch.utils.data import DataLoader
 
 # Own Modules Imports
@@ -74,13 +75,16 @@ def make_representations(arguments, device):
 
     log(arguments, "Models Initialised")
 
+    # Creates a folder if one does not exist.
+    os.makedirs(os.path.dirname(arguments["representation_dir"]), exist_ok=True)
+
     # Creates the HDF5 files used to store the training and testing data representations.
     train_representations = HDF5Handler(os.path.join(arguments["representation_dir"],
                                                      f"{arguments['experiment']}_train.h5"),
-                                        'x', encoder.encoder_size)
+                                        'x', (encoder.encoder_size, ))
     test_representations = HDF5Handler(os.path.join(arguments["representation_dir"],
                                                     f"{arguments['experiment']}_test.h5"),
-                                        'x', encoder.encoder_size)
+                                       'x', (encoder.encoder_size, ))
 
     log(arguments, "HDF5 Representation Files Created.")
 
@@ -101,7 +105,7 @@ def make_representations(arguments, device):
             representations = encoder.forward_features(images)
 
             # Moves the representations to the CPU.
-            representations.cpu().data.numpy()
+            representations = representations.cpu().data.numpy()
 
             # Adds the batch representations to the HDF5 file.
             train_representations.append(representations)
@@ -122,7 +126,7 @@ def make_representations(arguments, device):
             representations = encoder.forward_features(images)
 
             # Moves the representations to the CPU.
-            representations.cpu().data.numpy()
+            representations = representations.cpu().data.numpy()
 
             # Adds the batch representations to the HDF5 file.
             test_representations.append(representations)
