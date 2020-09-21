@@ -112,7 +112,7 @@ def train_cnn(arguments, device):
         # Loops through the dataset by each batch.
         for images, labels in training_data_loader:
 
-            # Loads the batch into memory and splits the batch into patches.
+            # Loads the batch into memory.
             images = images.to(device)
             labels = labels.to(device)
 
@@ -176,7 +176,7 @@ def train_cnn(arguments, device):
             validation_acc, validation_loss, validation_batches = 0, 0, 0
 
             for images, labels in validation_data_loader:
-                # Loads the batch into memory and splits the batch into patches.
+                # Loads the batch into memory.
                 images = images.to(device)
                 labels = labels.to(device)
 
@@ -301,7 +301,7 @@ def test_cnn(arguments, device):
         # Loops through the testing dataset.
         for images, labels in test_data_loader:
 
-            # Loads the batch into memory and splits the batch into patches.
+            # Loads the batch into memory.
             images = images.to(device)
             labels = labels.to(device)
 

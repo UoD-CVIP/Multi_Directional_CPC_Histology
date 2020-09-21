@@ -1,12 +1,14 @@
 ## -*- coding: utf-8 -*-
 
 """
-
+The file contains the function to get data representation from a trained Encoder model.
+    make_representations - Function to get representation from a trained Encoder model.
 """
 
 
 # Built-in/Generic Imports
 import os
+import time
 
 # Library Imports
 from torch.utils.data import DataLoader
@@ -80,6 +82,54 @@ def make_representations(arguments, device):
                                                     f"{arguments['experiment']}_test.h5"),
                                         'x', encoder.encoder_size)
 
-    train_labels, test_labels = [], []
-
     log(arguments, "HDF5 Representation Files Created.")
+
+    # Starts a timer.
+    start_time = time.time()
+
+    # Performs a representation generation with no gradients.
+    with torch.no_grad():
+
+        # Loops through the training data.
+        num_batches = 0
+        for images, _ in training_data_loader:
+
+            # Loads the image batch into memory.
+            images = images.to(device)
+
+            # Gets the representations from of the image batch from the encoder.
+            representations = encoder.forward_features(images)
+
+            # Moves the representations to the CPU.
+            representations.cpu().data.numpy()
+
+            # Adds the batch representations to the HDF5 file.
+            train_representations.append(representations)
+
+            # Prints information about representation extraction process.
+            num_batches += 1
+            if num_batches % arguments["log_intervals"] == 0:
+                print(f"Training Batches: {num_batches}/{len(train_data) // arguments['batch_size']}")
+
+        # Loops through the testing data.
+        num_batches = 0
+        for images, _ in testing_data_loader:
+
+            # Loads the image batch into memory.
+            images = images.to(device)
+
+            # Gets the representations from of the image batch from the encoder.
+            representations = encoder.forward_features(images)
+
+            # Moves the representations to the CPU.
+            representations.cpu().data.numpy()
+
+            # Adds the batch representations to the HDF5 file.
+            test_representations.append(representations)
+
+            # Prints information about representation extraction process.
+            num_batches += 1
+            if num_batches % arguments["log_intervals"] == 0:
+                print(f"Testing Batches: {num_batches}/{len(test_data) // arguments['batch_size']}")
+
+    print(f"Representations from {arguments['experiment']} encoder created in {int(time.time() - start_time)}s")
