@@ -155,6 +155,9 @@ def load_arguments(description):
     argument_parser.add_argument("--training_examples", type=int,
                                  default=int(config_parser["cnn"]["training_examples"]),
                                  help="Integer for the number of training examples to train the CNN.")
+    argument_parser.add_argument("--representation_dir", type=str,
+                                 default=config_parser["cnn"]["representation_dir"],
+                                 help="Directory path for where the representations will be saved.")
 
     # Debug Arguments
     argument_parser.add_argument("--batches_per_epoch", type=int,
