@@ -65,13 +65,9 @@ def train_cnn(arguments, device):
     log(arguments, "Loaded Datasets")
 
     # Initialises the encoder and autoregressor.
-    encoder = Encoder(0, arguments["image_size"], imagenet=arguments["pretrained"].lower() == "imagenet")
+    encoder = Encoder(arguments["cpc_code_size"], arguments["image_size"],
+                      imagenet=arguments["pretrained"].lower() == "imagenet")
     classifier = Classifier(encoder.encoder_size, 2, arguments["hidden_layer"])
-
-    # Loads weights from pretrained Contrastive Predictive Coding model.
-    if arguments["pretrained"].lower() == "cpc":
-        encoder_path = os.path.join(arguments["model_dir"], f"{arguments['experiment']}_encoder_best.pt")
-        encoder.load_state_dict(torch.load(encoder_path, map_location=device), strict=False)
 
     # Sets the models to training mode.
     encoder.train()
@@ -80,6 +76,11 @@ def train_cnn(arguments, device):
     # Moves the models to the selected device.
     encoder.to(device)
     classifier.to(device)
+
+    # Loads weights from pretrained Contrastive Predictive Coding model.
+    if arguments["pretrained"].lower() == "cpc":
+        encoder_path = os.path.join(arguments["model_dir"], f"{arguments['experiment']}_encoder_best.pt")
+        encoder.load_state_dict(torch.load(encoder_path, map_location=device), strict=False)
 
     # Combines the parameters from the two models.
     parameters = list(encoder.parameters()) + list(classifier.parameters())

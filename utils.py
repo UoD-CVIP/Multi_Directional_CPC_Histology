@@ -101,7 +101,7 @@ def get_device(arguments):
     """
 
     # If GPU is set to less than 0 then set device to use CPU.
-    if arguments["gpu"] > 0 and not torch.cuda.is_available():
+    if arguments["gpu"] < 0 and not torch.cuda.is_available():
         return torch.device("cpu")
 
     # Sets the GPU device to preferred device and checks if available.
