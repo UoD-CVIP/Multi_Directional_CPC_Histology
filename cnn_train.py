@@ -267,7 +267,7 @@ def test_cnn(arguments, device):
     log(arguments, "Loaded Testing Data")
 
     # Initialises the encoder and loads the trained weights.
-    encoder = Encoder(0, arguments["image_size"])
+    encoder = Encoder(arguments["cpc_code_size"], arguments["image_size"])
     encoder_path = os.path.join(arguments["model_dir"], f"{arguments['experiment']}_encoder_cnn_best.pt")
     encoder.load_state_dict(torch.load(encoder_path, map_location=device), strict=False)
 
