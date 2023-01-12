@@ -94,10 +94,9 @@ class Encoder(nn.Module):
         :param name: The name of the experiment to be saved.
         :param epoch: Integer for the current epoch to be included in the save name.
         """
-
+        
         # Checks if the save directory exists and if not creates it.
-        if not os.path.isdir(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
 
         # Saves the model to the save directory.
         if epoch is not None:
@@ -141,6 +140,8 @@ class Classifier(nn.Module):
         :param name: The name of the experiment to be saved.
         :param epoch: Integer for the current epoch to be included in the save name.
         """
+        
+        print(f"{path} - {str(epoch)} - {str(epoch)}")
 
         # Checks if the save directory exists and if not creates it.
         if not os.path.isdir(os.path.dirname(path)):
@@ -356,6 +357,8 @@ class MultiDirectionalPixelCNN(nn.Module):
         :param name: The name of the experiment to be saved.
         :param epoch: Integer for the current epoch to be included in the save name.
         """
+        
+        print(f"{path} - {str(epoch)} - {str(epoch)}")
 
         # Checks if the save directory exists and if not creates it.
         if not os.path.isdir(os.path.dirname(path)):

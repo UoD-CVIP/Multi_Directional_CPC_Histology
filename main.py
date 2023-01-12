@@ -12,7 +12,7 @@ from utils import *
 from config import *
 from cnn_train import *
 from cpc_train import *
-from representations import *
+#from representations import *
 
 
 __author__ = "Jacob Carse"
@@ -69,7 +69,8 @@ if __name__ == "__main__":
 
     # Generates representations using a trained encoder.
     elif arguments["task"].lower() == "representations":
-        make_representations(arguments, device)
+        pass
+        #make_representations(arguments, device)
 
     # If no valid argument was presented.
     else:

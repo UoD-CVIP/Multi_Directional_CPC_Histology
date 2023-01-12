@@ -158,8 +158,8 @@ class Dataset(data.Dataset):
             # Random 90 degree rotations.
             class RandomRotation:
                 def __init__(self, angles): self.angles = angles
-
-                def __call__(self, x): return transforms.functional.rotate(x, np.random.choice(self.angles))
+                def __call__(self, x):
+                    return transforms.functional.rotate(x, float(np.random.choice(self.angles)))
 
             # Additional transforms added to the list list of transformations.
             transformations = [transforms.RandomVerticalFlip(),

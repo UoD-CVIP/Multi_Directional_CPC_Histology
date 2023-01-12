@@ -1,4 +1,4 @@
-## -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
 This file contains implementations of the functions used to train the multi directional CPC model:
@@ -13,8 +13,8 @@ import time
 
 # Library Imports
 import torch
-from apex import amp
 from torch import optim
+from torch.cuda import amp
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -98,8 +98,7 @@ def train_cpc(arguments, device):
 
     # If 16 bit precision is being used change the model and optimisers precision.
     if arguments["precision"] == 16:
-        [encoder, autoregressor], optimiser = amp.initialize([encoder, autoregressor], optimiser,
-                                                             opt_level="O2", verbosity=False)
+        scaler = amp.GradScaler()
 
     # Checks if precision level is supported and if not defaults to 32.
     elif arguments["precision"] != 32:
@@ -121,87 +120,162 @@ def train_cpc(arguments, device):
         # Loops through the dataset by each batch.
         for batch, _ in training_data_loader:
             batch_losses = []
-
-            # Loads the batch into memory and splits the batch into patches.
-            batch = batch.to(device)
-            batch = extract_patches(arguments, batch, in_patches)
-
-            # Encodes the patches with the encoder.
-            encoded_batch = encoder.forward(batch)
-            encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
-            encoded_batch = encoded_batch.permute(0, 3, 1, 2)
-
-            # Loads the random patches into memory and splits into patches.
-            random_batch, _ = next(iter(random_training_loader))
-            random_batch = random_batch.to(device)
-            random_batch = extract_patches(arguments, random_batch, in_patches)
-
-            # Encodes the random patches with the encoder.
-            random_encoded = encoder.forward(random_batch)
-            random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
-            random_encoded = random_encoded.permute(0, 3, 1, 2)
-
-            # Clones the encoded batch for masking.
-            masked_batch = encoded_batch.clone()
-
-            # Applies a mask to the encoded batch.
-            if arguments["cpc_alt_mask"]:
-                for i in range(1, 6):
-                    for j in range(1, 6):
-                        masked_batch[:, :, i, j] = 0
-            else:
-                for i in range(3, 7):
-                    for j in range(0, 7):
-                        masked_batch[:, :, i, j] = 0
-
-            # Forward propagates the autoregressor with the masked batch.
-            predictions = autoregressor.forward(masked_batch)
-
-            # Loops through the images in the batch.
-            for image in range(arguments["batch_size"]):
-
-                # Gets the masked elements of the predicted and encoded patches.
-                if arguments["cpc_alt_mask"]:
-                    predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
-                    target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
-                else:
-                    predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
-                    target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
-
-                # Calculates the dot terms for the predicted patches.
-                good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
-                dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
-
-                # Loops through the random images for each batch.
-                for random_image in range(arguments["cpc_random_patches"]):
-
-                    # Gets the masked elements for the random patches.
-                    if arguments["cpc_alt_mask"]:
-                        random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
-                    else:
-                        random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
-
-                    # Calculates the dot terms for the random patches.
-                    bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
-                    dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
-
-                # Calculates the log softmax for all the dot terms.
-                log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
-                batch_losses.append(-log_softmax[0, ])
-
-            # Finds the loss of the batch by combinding the loss for each image in the batch.
-            loss = torch.mean(torch.cat(batch_losses))
-
-            # Backward propagates the loss over the model.
+            
             if arguments["precision"] == 16:
-                with amp.scale_loss(loss, optimiser) as scaled_loss:
-                    scaled_loss.backward()
+                with amp.autocast():
+                    # Loads the batch into memory and splits the batch into patches.
+                    batch = batch.to(device)
+                    batch = extract_patches(arguments, batch, in_patches)
+
+                    # Encodes the patches with the encoder.
+                    encoded_batch = encoder.forward(batch)
+                    encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
+                    encoded_batch = encoded_batch.permute(0, 3, 1, 2)
+
+                    # Loads the random patches into memory and splits into patches.
+                    random_batch, _ = next(iter(random_training_loader))
+                    random_batch = random_batch.to(device)
+                    random_batch = extract_patches(arguments, random_batch, in_patches)
+
+                    # Encodes the random patches with the encoder.
+                    random_encoded = encoder.forward(random_batch)
+                    random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                    random_encoded = random_encoded.permute(0, 3, 1, 2)
+
+                    # Clones the encoded batch for masking.
+                    masked_batch = encoded_batch.clone()
+
+                    # Applies a mask to the encoded batch.
+                    if arguments["cpc_alt_mask"]:
+                        for i in range(1, 6):
+                            for j in range(1, 6):
+                                masked_batch[:, :, i, j] = 0
+                    else:
+                        for i in range(3, 7):
+                            for j in range(0, 7):
+                                masked_batch[:, :, i, j] = 0
+
+                    # Forward propagates the autoregressor with the masked batch.
+                    predictions = autoregressor.forward(masked_batch)
+
+                    # Loops through the images in the batch.
+                    for image in range(arguments["batch_size"]):
+
+                        # Gets the masked elements of the predicted and encoded patches.
+                        if arguments["cpc_alt_mask"]:
+                            predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                            target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                        else:
+                            predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                            target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+
+                        # Calculates the dot terms for the predicted patches.
+                        good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                        dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+
+                        # Loops through the random images for each batch.
+                        for random_image in range(arguments["cpc_random_patches"]):
+
+                            # Gets the masked elements for the random patches.
+                            if arguments["cpc_alt_mask"]:
+                                random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                            else:
+                                random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                            # Calculates the dot terms for the random patches.
+                            bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                            dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                        # Calculates the log softmax for all the dot terms.
+                        log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                        batch_losses.append(-log_softmax[0, ])
+
+                    # Finds the loss of the batch by combinding the loss for each image in the batch.
+                    loss = torch.mean(torch.cat(batch_losses))
+                    
+                scaler.scale(loss).backward()
+                # Updates the weights of the model using the optimiser.
+                scaler.step(optimiser)
+                scaler.update()
+                optimiser.zero_grad()
+                    
             else:
+                # Loads the batch into memory and splits the batch into patches.
+                batch = batch.to(device)
+                batch = extract_patches(arguments, batch, in_patches)
+
+                # Encodes the patches with the encoder.
+                encoded_batch = encoder.forward(batch)
+                encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
+                encoded_batch = encoded_batch.permute(0, 3, 1, 2)
+
+                # Loads the random patches into memory and splits into patches.
+                random_batch, _ = next(iter(random_training_loader))
+                random_batch = random_batch.to(device)
+                random_batch = extract_patches(arguments, random_batch, in_patches)
+
+                # Encodes the random patches with the encoder.
+                random_encoded = encoder.forward(random_batch)
+                random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                random_encoded = random_encoded.permute(0, 3, 1, 2)
+
+                # Clones the encoded batch for masking.
+                masked_batch = encoded_batch.clone()
+
+                # Applies a mask to the encoded batch.
+                if arguments["cpc_alt_mask"]:
+                    for i in range(1, 6):
+                        for j in range(1, 6):
+                            masked_batch[:, :, i, j] = 0
+                else:
+                    for i in range(3, 7):
+                        for j in range(0, 7):
+                            masked_batch[:, :, i, j] = 0
+
+                # Forward propagates the autoregressor with the masked batch.
+                predictions = autoregressor.forward(masked_batch)
+
+                # Loops through the images in the batch.
+                for image in range(arguments["batch_size"]):
+
+                    # Gets the masked elements of the predicted and encoded patches.
+                    if arguments["cpc_alt_mask"]:
+                        predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                        target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                    else:
+                        predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                        target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+
+                    # Calculates the dot terms for the predicted patches.
+                    good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                    dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+
+                    # Loops through the random images for each batch.
+                    for random_image in range(arguments["cpc_random_patches"]):
+
+                        # Gets the masked elements for the random patches.
+                        if arguments["cpc_alt_mask"]:
+                            random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                        else:
+                            random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                        # Calculates the dot terms for the random patches.
+                        bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                        dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                    # Calculates the log softmax for all the dot terms.
+                    log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                    batch_losses.append(-log_softmax[0, ])
+
+                # Finds the loss of the batch by combinding the loss for each image in the batch.
+                loss = torch.mean(torch.cat(batch_losses))
+                    
                 loss.backward()
 
-            # Updates the weights of the optimiser using the back propagated loss.
-            optimiser.step()
-            optimiser.zero_grad()
+                # Updates the weights of the model using the optimiser.
+                optimiser.step()
+                optimiser.zero_grad()
+                
 
             # Adds the batch loss to the epoch loss and updates the number of batches.
             num_batches += 1
@@ -238,72 +312,141 @@ def train_cpc(arguments, device):
             for batch, _ in validation_data_loader:
                 batch_losses = []
 
-                # Moves the batch to the selected device and splits the images to patches.
-                batch = batch.to(device)
-                batch = extract_patches(arguments, batch, in_patches)
+                if arguments["precision"] == 16:
+                    with amp.autocast():
+                        # Moves the batch to the selected device and splits the images to patches.
+                        batch = batch.to(device)
+                        batch = extract_patches(arguments, batch, in_patches)
 
-                # Encodes the patches with the encoder.
-                encoded_batch = encoder.forward(batch)
-                encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
-                encoded_batch = encoded_batch.permute(0, 3, 1, 2)
+                        # Encodes the patches with the encoder.
+                        encoded_batch = encoder.forward(batch)
+                        encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
+                        encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
-                # Loads the random patches into memory and splits into patches.
-                random_batch, _ = next(iter(random_validation_loader))
-                random_batch = random_batch.to(device)
-                random_batch = extract_patches(arguments, random_batch, in_patches)
+                        # Loads the random patches into memory and splits into patches.
+                        random_batch, _ = next(iter(random_validation_loader))
+                        random_batch = random_batch.to(device)
+                        random_batch = extract_patches(arguments, random_batch, in_patches)
 
-                # Encodes the random patches with the encoder.
-                random_encoded = encoder.forward(random_batch)
-                random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
-                random_encoded = random_encoded.permute(0, 3, 1, 2)
+                        # Encodes the random patches with the encoder.
+                        random_encoded = encoder.forward(random_batch)
+                        random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                        random_encoded = random_encoded.permute(0, 3, 1, 2)
 
-                # Clones the encoded batch for masking.
-                masked_batch = encoded_batch.clone()
+                        # Clones the encoded batch for masking.
+                        masked_batch = encoded_batch.clone()
 
-                # Applies a mask to the encoded batch.
-                if arguments["cpc_alt_mask"]:
-                    for i in range(1, 6):
-                        for j in range(1, 6):
-                            masked_batch[:, :, i, j] = 0
+                        # Applies a mask to the encoded batch.
+                        if arguments["cpc_alt_mask"]:
+                            for i in range(1, 6):
+                                for j in range(1, 6):
+                                    masked_batch[:, :, i, j] = 0
+                        else:
+                            for i in range(3, 7):
+                                for j in range(0, 7):
+                                    masked_batch[:, :, i, j] = 0
+
+                        # Forward propagates the autoregressor with the masked batch.
+                        predictions = autoregressor.forward(masked_batch)
+
+                        # Loops through the images in the batch.
+                        for image in range(arguments["batch_size"]):
+
+                            # Gets the masked elements for the random patches.
+                            if arguments["cpc_alt_mask"]:
+                                predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                                target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                            else:
+                                predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                                target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+
+                            # Calculates the dot terms for the predicted patches.
+                            good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                            dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+
+                            # Loops through the random images for each batch.
+                            for random_image in range(arguments["cpc_random_patches"]):
+
+                                # Gets the masked elements for the random patches.
+                                if arguments["cpc_alt_mask"]:
+                                    random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                                else:
+                                    random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                                # Calculates the dot terms for the random patches.
+                                bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                                dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                            # Calculates the log softmax for all the dot terms.
+                            log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                            batch_losses.append(-log_softmax[0,])
                 else:
-                    for i in range(3, 7):
-                        for j in range(0, 7):
-                            masked_batch[:, :, i, j] = 0
+                    # Moves the batch to the selected device and splits the images to patches.
+                    batch = batch.to(device)
+                    batch = extract_patches(arguments, batch, in_patches)
 
-                # Forward propagates the autoregressor with the masked batch.
-                predictions = autoregressor.forward(masked_batch)
+                    # Encodes the patches with the encoder.
+                    encoded_batch = encoder.forward(batch)
+                    encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
+                    encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
-                # Loops through the images in the batch.
-                for image in range(arguments["batch_size"]):
+                    # Loads the random patches into memory and splits into patches.
+                    random_batch, _ = next(iter(random_validation_loader))
+                    random_batch = random_batch.to(device)
+                    random_batch = extract_patches(arguments, random_batch, in_patches)
 
-                    # Gets the masked elements for the random patches.
+                    # Encodes the random patches with the encoder.
+                    random_encoded = encoder.forward(random_batch)
+                    random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                    random_encoded = random_encoded.permute(0, 3, 1, 2)
+
+                    # Clones the encoded batch for masking.
+                    masked_batch = encoded_batch.clone()
+
+                    # Applies a mask to the encoded batch.
                     if arguments["cpc_alt_mask"]:
-                        predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
-                        target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                        for i in range(1, 6):
+                            for j in range(1, 6):
+                                masked_batch[:, :, i, j] = 0
                     else:
-                        predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
-                        target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+                        for i in range(3, 7):
+                            for j in range(0, 7):
+                                masked_batch[:, :, i, j] = 0
 
-                    # Calculates the dot terms for the predicted patches.
-                    good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
-                    dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+                    # Forward propagates the autoregressor with the masked batch.
+                    predictions = autoregressor.forward(masked_batch)
 
-                    # Loops through the random images for each batch.
-                    for random_image in range(arguments["cpc_random_patches"]):
+                    # Loops through the images in the batch.
+                    for image in range(arguments["batch_size"]):
 
                         # Gets the masked elements for the random patches.
                         if arguments["cpc_alt_mask"]:
-                            random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                            predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                            target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
                         else:
-                            random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+                            predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                            target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
 
-                        # Calculates the dot terms for the random patches.
-                        bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
-                        dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+                        # Calculates the dot terms for the predicted patches.
+                        good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                        dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
 
-                    # Calculates the log softmax for all the dot terms.
-                    log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
-                    batch_losses.append(-log_softmax[0,])
+                        # Loops through the random images for each batch.
+                        for random_image in range(arguments["cpc_random_patches"]):
+
+                            # Gets the masked elements for the random patches.
+                            if arguments["cpc_alt_mask"]:
+                                random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                            else:
+                                random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                            # Calculates the dot terms for the random patches.
+                            bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                            dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                        # Calculates the log softmax for all the dot terms.
+                        log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                        batch_losses.append(-log_softmax[0,])
 
                 # Combines the loss for each image into a batch loss
                 validation_batches += 1
@@ -336,8 +479,8 @@ def train_cpc(arguments, device):
             autoregressor.save_model(arguments["model_dir"], arguments["experiment"], "best")
 
         # Saves the models with reference to the current epoch.
-        encoder.save_model(arguments["model_dir"], arguments["experiment"], epoch)
-        autoregressor.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+        #encoder.save_model(arguments["model_dir"], arguments["experiment"], epoch)
+        #autoregressor.save_model(arguments["model_dir"], arguments["experiment"], epoch)
 
         # Checks if training has performed the minimum number of epochs.
         if epoch >= arguments["min_epochs"]:
@@ -408,14 +551,6 @@ def test_cpc(arguments, device):
     encoder.to(device)
     autoregressor.to(device)
 
-    # If 16 bit precision is being used change the model and optimisers precision.
-    if arguments["precision"] == 16:
-        [encoder, autoregressor] = amp.initialize([encoder, autoregressor], opt_level="O2", verbosity=False)
-
-    # Checks if precision level is supported and if not defaults to 32.
-    elif arguments["precision"] != 32:
-        log(arguments, "Only 16 and 32 bit precision supported. Defaulting to 32 bit precision.")
-
     log(arguments, "Models Initialised")
 
     # Performs a testing epoch with no gradients.
@@ -427,73 +562,144 @@ def test_cpc(arguments, device):
         # Loops through the testing dataset.
         for batch, _ in test_data_loader:
             batch_losses = []
+            
+            if arguments["precision"] == 16:
+                with amp.autocast:
 
-            # Moves the batch to the selected device and splits the images to patches.
-            batch = batch.to(device)
-            batch = extract_patches(arguments, batch, in_patches)
+                    # Moves the batch to the selected device and splits the images to patches.
+                    batch = batch.to(device)
+                    batch = extract_patches(arguments, batch, in_patches)
 
-            # Encodes the patches with the encoder.
-            encoded_batch = encoder.forward(batch)
-            encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
-            encoded_batch = encoded_batch.permute(0, 3, 1, 2)
+                    # Encodes the patches with the encoder.
+                    encoded_batch = encoder.forward(batch)
+                    encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
+                    encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
-            # Loads the random patches into memory and splits into patches.
-            random_batch, _ = next(iter(random_test_loader))
-            random_batch = random_batch.to(device)
-            random_batch = extract_patches(arguments, random_batch, in_patches)
+                    # Loads the random patches into memory and splits into patches.
+                    random_batch, _ = next(iter(random_test_loader))
+                    random_batch = random_batch.to(device)
+                    random_batch = extract_patches(arguments, random_batch, in_patches)
 
-            # Encodes the random patches with the encoder.
-            random_encoded = encoder.forward(random_batch)
-            random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
-            random_encoded = random_encoded.permute(0, 3, 1, 2)
+                    # Encodes the random patches with the encoder.
+                    random_encoded = encoder.forward(random_batch)
+                    random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                    random_encoded = random_encoded.permute(0, 3, 1, 2)
 
-            # Clones the encoded batch for masking.
-            masked_batch = encoded_batch.clone()
+                    # Clones the encoded batch for masking.
+                    masked_batch = encoded_batch.clone()
 
-            # Applies a mask to the encoded batch.
-            if arguments["cpc_alt_mask"]:
-                for i in range(1, 6):
-                    for j in range(1, 6):
-                        masked_batch[:, :, i, j] = 0
+                    # Applies a mask to the encoded batch.
+                    if arguments["cpc_alt_mask"]:
+                        for i in range(1, 6):
+                            for j in range(1, 6):
+                                masked_batch[:, :, i, j] = 0
+                    else:
+                        for i in range(3, 7):
+                            for j in range(0, 7):
+                                masked_batch[:, :, i, j] = 0
+
+                    # Forward propagates the autoregressor with the masked batch.
+                    predictions = autoregressor.forward(masked_batch)
+
+                    # Loops through the images in the batch.
+                    for image in range(arguments["batch_size"]):
+
+                        # Gets the masked elements for the random patches.
+                        if arguments["cpc_alt_mask"]:
+                            predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                            target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                        else:
+                            predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                            target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+
+                        # Calculates the dot terms for the predicted patches.
+                        good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                        dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+
+                        # Loops through the random images for each batch.
+                        for random_image in range(arguments["cpc_random_patches"]):
+
+                            # Gets the masked elements for the random patches.
+                            if arguments["cpc_alt_mask"]:
+                                random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                            else:
+                                random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                            # Calculates the dot terms for the random patches.
+                            bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                            dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                        # Calculates the log softmax for all the dot terms.
+                        log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                        batch_losses.append(-log_softmax[0,])
+                        
             else:
-                for i in range(3, 7):
-                    for j in range(0, 7):
-                        masked_batch[:, :, i, j] = 0
+                # Moves the batch to the selected device and splits the images to patches.
+                batch = batch.to(device)
+                batch = extract_patches(arguments, batch, in_patches)
 
-            # Forward propagates the autoregressor with the masked batch.
-            predictions = autoregressor.forward(masked_batch)
+                # Encodes the patches with the encoder.
+                encoded_batch = encoder.forward(batch)
+                encoded_batch = encoded_batch.view(arguments["batch_size"], in_patches, in_patches, -1)
+                encoded_batch = encoded_batch.permute(0, 3, 1, 2)
 
-            # Loops through the images in the batch.
-            for image in range(arguments["batch_size"]):
+                # Loads the random patches into memory and splits into patches.
+                random_batch, _ = next(iter(random_test_loader))
+                random_batch = random_batch.to(device)
+                random_batch = extract_patches(arguments, random_batch, in_patches)
 
-                # Gets the masked elements for the random patches.
+                # Encodes the random patches with the encoder.
+                random_encoded = encoder.forward(random_batch)
+                random_encoded = random_encoded.view(arguments["cpc_random_patches"], in_patches, in_patches, -1)
+                random_encoded = random_encoded.permute(0, 3, 1, 2)
+
+                # Clones the encoded batch for masking.
+                masked_batch = encoded_batch.clone()
+
+                # Applies a mask to the encoded batch.
                 if arguments["cpc_alt_mask"]:
-                    predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
-                    target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
+                    for i in range(1, 6):
+                        for j in range(1, 6):
+                            masked_batch[:, :, i, j] = 0
                 else:
-                    predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
-                    target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
+                    for i in range(3, 7):
+                        for j in range(0, 7):
+                            masked_batch[:, :, i, j] = 0
 
-                # Calculates the dot terms for the predicted patches.
-                good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
-                dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
+                # Forward propagates the autoregressor with the masked batch.
+                predictions = autoregressor.forward(masked_batch)
 
-                # Loops through the random images for each batch.
-                for random_image in range(arguments["cpc_random_patches"]):
+                # Loops through the images in the batch.
+                for image in range(arguments["batch_size"]):
 
                     # Gets the masked elements for the random patches.
                     if arguments["cpc_alt_mask"]:
-                        random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                        predicted_patches = predictions[image, :, 1:6, 1:6].reshape(1, -1)
+                        target_patches = encoded_batch[image, :, 1:6, 1:6].reshape(1, -1)
                     else:
-                        random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+                        predicted_patches = predictions[image, :, 3:7, 0:7].reshape(1, -1)
+                        target_patches = encoded_batch[image, :, 3:7, 0:7].reshape(1, -1)
 
-                    # Calculates the dot terms for the random patches.
-                    bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
-                    dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+                    # Calculates the dot terms for the predicted patches.
+                    good_dot_terms = torch.sum(predicted_patches * target_patches, dim=1)
+                    dot_terms = [torch.unsqueeze(good_dot_terms, dim=0)]
 
-                # Calculates the log softmax for all the dot terms.
-                log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
-                batch_losses.append(-log_softmax[0,])
+                    # Loops through the random images for each batch.
+                    for random_image in range(arguments["cpc_random_patches"]):
+
+                        # Gets the masked elements for the random patches.
+                        if arguments["cpc_alt_mask"]:
+                            random_patches = random_encoded[random_image, :, 1:6, 1:6].reshape(1, -1)
+                        else:
+                            random_patches = random_encoded[random_image, :, 3:7, 0:7].reshape(1, -1)
+
+                        # Calculates the dot terms for the random patches.
+                        bad_dot_terms = torch.sum(predicted_patches * random_patches, dim=1)
+                        dot_terms.append(torch.unsqueeze(bad_dot_terms, dim=0))
+
+                    # Calculates the log softmax for all the dot terms.
+                    log_softmax = torch.log_softmax(torch.cat(dot_terms, dim=0), dim=0)
+                    batch_losses.append(-log_softmax[0,])
 
             # Combines the loss for each image into a batch loss.
             num_batches += 1

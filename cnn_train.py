@@ -13,8 +13,8 @@ import time
 
 # Library Imports
 import torch
-from apex import amp
 from torch import optim
+from torch.cuda import amp
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -90,8 +90,7 @@ def train_cnn(arguments, device):
 
     # If 16 bit precision is being used change the model and optimiser precision.
     if arguments["precision"] == 16:
-        [encoder, classifier], optimiser = amp.initialize([encoder, classifier], optimiser,
-                                                          opt_level="O2", verbosity=False)
+        scaler = amp.GradScaler()
 
     # Checks if precision level is supported and if not defaults to 32.
     elif arguments["precision"] != 32:
@@ -116,29 +115,46 @@ def train_cnn(arguments, device):
             # Loads the batch into memory.
             images = images.to(device)
             labels = labels.to(device)
-
-            # Encodes the images with the encoder.
-            encoded_images = encoder.forward_features(images)
-
-            # Classifies the encoded images.
-            predictions = classifier.forward(encoded_images)
-
-            # Calculates the batch accuracy.
-            batch_acc = (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
-
-            # Finds the loss of the batch using the predictions.
-            loss = F.cross_entropy(predictions, labels.type(torch.long))
-
-            # Backward propagates the loss over the model.
+            
             if arguments["precision"] == 16:
-                with amp.scale_loss(loss, optimiser) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
+                with amp.autocast():
+                    # Encodes the images with the encoder.
+                    encoded_images = encoder.forward_features(images)
 
-            # Updates the weights of the optimiser using the back propagated loss.
-            optimiser.step()
-            optimiser.zero_grad()
+                    # Classifies the encoded images.
+                    predictions = classifier.forward(encoded_images)
+
+                    # Calculates the batch accuracy.
+                    batch_acc = (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
+
+                    # Finds the loss of the batch using the predictions.
+                    loss = F.cross_entropy(predictions, labels.type(torch.long))
+                    
+                scaler.scale(loss).backward()
+                    
+                scaler.step(optimiser)
+                    
+                scaler.update()
+
+                optimiser.zero_grad()
+                
+            else:
+                # Encodes the images with the encoder.
+                encoded_images = encoder.forward_features(images)
+
+                # Classifies the encoded images.
+                predictions = classifier.forward(encoded_images)
+
+                # Calculates the batch accuracy.
+                batch_acc = (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
+
+                # Finds the loss of the batch using the predictions.
+                loss = F.cross_entropy(predictions, labels.type(torch.long))
+                
+                loss.backward
+                optimiser.step()
+                optimiser.zero_grad()
+                
 
             # Adds the batch loss to the epoch loss and updates the number of batches.
             num_batches += 1
@@ -180,12 +196,21 @@ def train_cnn(arguments, device):
                 # Loads the batch into memory.
                 images = images.to(device)
                 labels = labels.to(device)
+                
+                if arguments["precision"] == 16:
+                    with amp.autocast():
+                        # Encodes the images with the encoder.
+                        encoded_images = encoder.forward_features(images)
 
-                # Encodes the images with the encoder.
-                encoded_images = encoder.forward_features(images)
+                        # Classifies the encoded images.
+                        predictions = classifier.forward(encoded_images)
+                        
+                else:
+                    # Encodes the images with the encoder.
+                    encoded_images = encoder.forward_features(images)
 
-                # Classifies the encoded images.
-                predictions = classifier.forward(encoded_images)
+                    # Classifies the encoded images.
+                    predictions = classifier.forward(encoded_images)
 
                 # Calculates the batch accuracy.
                 batch_acc = (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
@@ -195,7 +220,7 @@ def train_cnn(arguments, device):
 
                 # Adds the batch loss and accuracy to the epoch loss and accuracy and updates the number of batches.
                 validation_batches += 1
-                validation_loss += loss
+                validation_loss += loss.item()
                 validation_acc += batch_acc
 
                 # Stops the epoch early if specified.
@@ -225,8 +250,8 @@ def train_cnn(arguments, device):
             classifier.save_model(arguments["model_dir"], arguments["experiment"], "cnn_best")
 
         # Saves the models with reference to the current epoch.
-        encoder.save_model(arguments["model_dir"], arguments["experiment"], f"cnn_{epoch}")
-        classifier.save_model(arguments["model_dir"], arguments["experiment"], f"cnn_{epoch}")
+        #encoder.save_model(arguments["model_dir"], arguments["experiment"], f"cnn_{epoch}")
+        #classifier.save_model(arguments["model_dir"], arguments["experiment"], f"cnn_{epoch}")
 
         # Checks if training has performed the minimum number of epochs.
         if epoch >= arguments["min_epochs"]:
@@ -284,14 +309,6 @@ def test_cnn(arguments, device):
     encoder.to(device)
     classifier.to(device)
 
-    # If 16 bit precision is being used change the model precision.
-    if arguments["precision"] == 16:
-        [encoder, classifier] = amp.initialize([encoder, classifier], opt_level="O2", verbosity=False)
-
-    # Checks if precision level is supported and if not defaults to 32.
-    elif arguments["precision"] != 32:
-        log(arguments, "Only 16 and 32 bit precision supported. Defaulting to 32 bit precision.")
-
     log(arguments, "Models Initialised")
 
     # Performs a testing epoch with no gradients.
@@ -306,11 +323,19 @@ def test_cnn(arguments, device):
             images = images.to(device)
             labels = labels.to(device)
 
-            # Encodes the images with the encoder.
-            encoded_images = encoder.forward_features(images)
+            if arguments["precision"] == 16:
+                with amp.autocast():
+                    # Encodes the images with the encoder.
+                    encoded_images = encoder.forward_features(images)
 
-            # Classifiers the encoded images.
-            predictions = classifier.forward(encoded_images)
+                    # Classifiers the encoded images.
+                    predictions = classifier.forward(encoded_images)
+            else:
+                # Encodes the images with the encoder.
+                encoded_images = encoder.forward_features(images)
+
+                # Classifiers the encoded images.
+                predictions = classifier.forward(encoded_images)
 
             # Calculates the batch accuracy.
             accuracy += (predictions.max(dim=1)[1] == labels).sum().double() / labels.shape[0]
